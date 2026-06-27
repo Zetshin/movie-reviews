@@ -12,26 +12,24 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 
 	ts, err := template.ParseFiles("./ui/html/pages/home.tmpl")
 	if err != nil {
-		app.logger.Error(err.Error(), r.Method, "uri", r.URL.RequestURI())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		app.serverError(w, r, err)
 		return
 
 	}
 
 	err = ts.Execute(w, nil)
 	if err != nil {
-		app.logger.Error(err.Error(), r.Method, "uri", r.URL.RequestURI())
-		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		app.serverError(w, r, err)
 	}
 }
 
-func profile(w http.ResponseWriter, r *http.Request) {
+func (app *application) profile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Profile :D"))
 }
-func moviesShow(w http.ResponseWriter, r *http.Request) {
+func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Movie tries"))
 }
-func movieDetail(w http.ResponseWriter, r *http.Request) {
+func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
 	if err != nil || movieID < 1 {
 		http.NotFound(w, r)
@@ -40,7 +38,7 @@ func movieDetail(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Display a detail for movieID %d..", movieID)
 	w.Write([]byte(msg))
 }
-func movieReview(w http.ResponseWriter, r *http.Request) {
+func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
 	if err != nil || movieID < 1 {
 		http.NotFound(w, r)
@@ -50,7 +48,7 @@ func movieReview(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(msg))
 }
 
-func movieReviewPost(w http.ResponseWriter, r *http.Request) {
+func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
 	if err != nil || movieID < 1 {
 		http.NotFound(w, r)
