@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -40,7 +41,23 @@ func (m *MovieModel) Insert(title string, description string, release_date time.
 
 // This will return a specific snippet based on its id.
 func (m *MovieModel) Get(id int) (Movie, error) {
-	return Movie{}, nil
+	stmt := `SELECT id, title, description, release_date, poster_image FROM movies
+	WHERE id = ?`
+
+	row := m.DB.QueryRow(stmt, id)
+
+	var s Movie
+
+	err := row.Scan(&s.ID, &s.Title, &s.Description, &s.Release_date, &s.Poster_image)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Movie{}, ErrNoRecord
+		} else {
+			return Movie{}, err
+		}
+	}
+	return s, nil
+
 }
 
 // This will return the 10 most recently created snippets.
