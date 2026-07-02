@@ -1,0 +1,22 @@
+{{define "title"}}Movie #{{.ID}}{{end}}
+
+{{define "main"}}
+<div class='snippet'>
+
+  <div class='metadata'>
+    <strong>{{.Title}}</strong>
+    <span>#{{.ID}}</span>
+  </div>
+
+  <div class='poster'>
+    <p>Poster: {{.Poster_image}}</p>
+  </div>
+
+  <pre><code>{{.Description}}</code></pre>
+
+  <div class='metadata'>
+    <time>Release: {{.Release_date}}</time>
+  </div>
+
+</div>
+{{end}}

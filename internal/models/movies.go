@@ -62,5 +62,26 @@ func (m *MovieModel) Get(id int) (Movie, error) {
 
 // This will return the 10 most recently created snippets.
 func (m *MovieModel) Latest() ([]Movie, error) {
-	return nil, nil
+	stmt := `SELECT id, title, description, release_date, poster_image FROM movies
+	ORDER BY id DESC LIMIT 10`
+	rows, err := m.DB.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+	var movies []Movie
+	for rows.Next() {
+		var s Movie
+		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.Release_date, &s.Poster_image)
+		if err != nil {
+			return nil, err
+		}
+		movies = append(movies, s)
+
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return movies, nil
 }

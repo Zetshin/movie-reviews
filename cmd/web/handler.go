@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+
 	"html/template"
 	"net/http"
 	"strconv"
@@ -13,6 +14,14 @@ import (
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "Go")
+	movies, err := app.movies.Latest()
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	for _, movie := range movies {
+		fmt.Fprintf(w, "%+v\n", movie)
+	}
 
 	ts, err := template.ParseFiles("./ui/html/pages/home.tmpl")
 	if err != nil {
@@ -48,8 +57,23 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	files := []string{
+		"./ui/html/base.tmpl",
+		"./ui/html/partials/nav.tmpl",
+		"./ui/html/pages/detail.tmpl",
+	}
+	ts, err := template.ParseFiles(files...)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	// And then execute them. Notice how we are passing in the snippet
+	// data (a models.Snippet struct) as the final parameter?
+	err = ts.ExecuteTemplate(w, "base", movie)
+	if err != nil {
+		app.serverError(w, r, err)
+	}
 
-	fmt.Fprintf(w, "%+v", movie)
 }
 func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
