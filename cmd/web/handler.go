@@ -67,9 +67,12 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+	data := templateData{
+		Movie: movie,
+	}
 	// And then execute them. Notice how we are passing in the snippet
 	// data (a models.Snippet struct) as the final parameter?
-	err = ts.ExecuteTemplate(w, "base", movie)
+	err = ts.ExecuteTemplate(w, "base", data)
 	if err != nil {
 		app.serverError(w, r, err)
 	}

@@ -1,21 +1,21 @@
-{{define "title"}}Movie #{{.ID}}{{end}}
+{{define "title"}}Movie #{{.Movie.ID}}{{end}}
 
 {{define "main"}}
 <div class='snippet'>
 
   <div class='metadata'>
-    <strong>{{.Title}}</strong>
-    <span>#{{.ID}}</span>
+    <strong>{{.Movie.Title}}</strong>
+    <span>#{{.Movie.ID}}</span>
   </div>
 
   <div class='poster'>
-    <p>Poster: {{.Poster_image}}</p>
+    <p>Poster: {{.Movie.Poster_image}}</p>
   </div>
 
-  <pre><code>{{.Description}}</code></pre>
+  <pre><code>{{.Movie.Description}}</code></pre>
 
   <div class='metadata'>
-    <time>Release: {{.Release_date}}</time>
+    <time>Release: {{.Movie.Release_date}}</time>
   </div>
 
 </div>
