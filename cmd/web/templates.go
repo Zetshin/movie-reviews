@@ -7,5 +7,6 @@ import "github.com/Zetshin/movie-reviews/internal/models"
 // At the moment it only contains one field, but we'll add more
 // to it as the project progresses.
 type templateData struct {
-	Movie models.Movie
+	Movie  models.Movie
+	Movies []models.Movie
 }

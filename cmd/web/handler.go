@@ -13,34 +13,39 @@ import (
 )
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
-	w.Header().Add("Server", "Go")
-	movies, err := app.movies.Latest()
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	for _, movie := range movies {
-		fmt.Fprintf(w, "%+v\n", movie)
-	}
 
-	ts, err := template.ParseFiles("./ui/html/pages/home.tmpl")
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-
-	}
-
-	err = ts.Execute(w, nil)
-	if err != nil {
-		app.serverError(w, r, err)
-	}
 }
 
 func (app *application) profile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Profile :D"))
 }
 func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Movie tries"))
+	w.Header().Add("Server", "Go")
+	movies, err := app.movies.Latest()
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	files := []string{
+		"./ui/html/base.tmpl",
+		"./ui/html/partials/nav.tmpl",
+		"./ui/html/pages/detail.tmpl",
+	}
+
+	ts, err := template.ParseFiles(files...)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	data := templateData{
+		Movies: movies,
+	}
+	err = ts.ExecuteTemplate(w, "base", data)
+	if err != nil {
+		app.serverError(w, r, err)
+	}
 }
 func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))

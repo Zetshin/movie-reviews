@@ -7,11 +7,12 @@ import (
 )
 
 type Movie struct {
-	ID           int
-	Title        string
-	Description  string
-	Release_date time.Time
-	Poster_image string
+	ID          int
+	Title       string
+	Description string
+	ReleaseDate time.Time
+	PosterImage string
+	AvgRating   string
 }
 
 // Define a SnippetModel type which wraps a sql.DB connection pool.
@@ -48,7 +49,7 @@ func (m *MovieModel) Get(id int) (Movie, error) {
 
 	var s Movie
 
-	err := row.Scan(&s.ID, &s.Title, &s.Description, &s.Release_date, &s.Poster_image)
+	err := row.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Movie{}, ErrNoRecord
@@ -73,7 +74,7 @@ func (m *MovieModel) Latest() ([]Movie, error) {
 	var movies []Movie
 	for rows.Next() {
 		var s Movie
-		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.Release_date, &s.Poster_image)
+		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage)
 		if err != nil {
 			return nil, err
 		}
