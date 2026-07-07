@@ -115,3 +115,13 @@ func (app *application) movieCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	http.Redirect(w, r, fmt.Sprintf("/movies/%d", id), http.StatusSeeOther)
 }
+
+func (app *application) actorDetail(w http.ResponseWriter, r *http.Request) {
+	actorID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || id < 1 {
+		http.NotFound(w, r)
+		return
+	}
+	msg := fmt.Sprintf("Display a specific actor with ID %d...", id)
+	w.Write([]byte(msg))
+}
