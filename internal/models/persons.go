@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -31,19 +32,18 @@ func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profi
 	return int(id), nil
 }
 
-func (m *PersonModel) Get(id int) (Person, error){
+func (m *PersonModel) Get(id int) (Person, error) {
 	stmt := `SELECT id, name, bio, birthDate, profileImage FROM persons
 	WHERE id = ?`
 	row := m.DB.QueryRow(stmt, id)
-	var p Person 
-	err := row.Scan(&p.ID, &p.name, &p.bio, &p.BirthDate, &p.ProfileImage) 
-		err != nil {
-			if errors.Is(err,sql.ErrNoRows){
-			return Movie{}, ErrErrNoRecord
+	var p Person
+	err := row.Scan(&p.ID, &p.Name, &p.Bio, &p.BirthDate, &p.ProfileImage)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Person{}, ErrNoRecord
 		} else {
-			return Snippet{}, err
+			return Person{}, err
 		}
-		}
-		
+	}
+	return p, nil
 }
-

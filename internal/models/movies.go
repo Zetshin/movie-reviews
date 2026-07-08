@@ -12,6 +12,7 @@ type Movie struct {
 	Description string
 	ReleaseDate time.Time
 	PosterImage string
+	ReviewCount string
 	AvgRating   string
 }
 
@@ -42,14 +43,14 @@ func (m *MovieModel) Insert(title string, description string, release_date time.
 
 // This will return a specific snippet based on its id.
 func (m *MovieModel) Get(id int) (Movie, error) {
-	stmt := `SELECT id, title, description, release_date, poster_image FROM movies
+	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating, FROM movies
 	WHERE id = ?`
 
 	row := m.DB.QueryRow(stmt, id)
 
 	var s Movie
 
-	err := row.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage)
+	err := row.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage, &s.ReviewCount, &s.AvgRating)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Movie{}, ErrNoRecord
@@ -63,7 +64,7 @@ func (m *MovieModel) Get(id int) (Movie, error) {
 
 // This will return the 10 most recently created snippets.
 func (m *MovieModel) Latest() ([]Movie, error) {
-	stmt := `SELECT id, title, description, release_date, poster_image FROM movies
+	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating FROM movies
 	ORDER BY id DESC LIMIT 10`
 	rows, err := m.DB.Query(stmt)
 	if err != nil {
@@ -74,7 +75,7 @@ func (m *MovieModel) Latest() ([]Movie, error) {
 	var movies []Movie
 	for rows.Next() {
 		var s Movie
-		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage)
+		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage, &s.ReviewCount, &s.AvgRating)
 		if err != nil {
 			return nil, err
 		}
