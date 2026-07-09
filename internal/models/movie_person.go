@@ -49,8 +49,8 @@ func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
 }
 
 func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, error) {
-	stmt := `SELECT movies.*, movie_person.role
-	From movies
+	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, movies.poster_image, movies.review_count, movies.avg_rating,movie_person.role
+	From movie
 	JOIN movie_person
 	ON movies.id = movie_person.movie_id
 	WHERE movie_person.person_id = ?`
@@ -73,4 +73,14 @@ func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, erro
 		return nil, err
 	}
 	return movies, nil
+}
+
+func (m *MoviePersonModel) Insert(movieID int, personID int, role string) error {
+	stmt := `INSERT INTO movie_person (movie_id, person_id, role)
+	VALUES (?,?,?)`
+	_, err := m.DB.Exec(stmt, movieID, personID, role)
+	if err != nil {
+		return err
+	}
+	return nil
 }
