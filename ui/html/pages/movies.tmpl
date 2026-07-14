@@ -1,9 +1,8 @@
 {{define "title"}}Movie #{{.Movie.ID}}{{end}}
 
 {{define "main"}}
-
-{{if .Movie}}
-{{range
+{{if .Movies}}
+{{range.Movies}}
 <div class='snippet'>
 
   <div class='metadata'>
@@ -12,16 +11,16 @@
   </div>
 
   <div class='poster'>
-    <p>Poster: {{.Poster_image}}</p>
+    <p>Poster: {{.PosterImage}}</p>
   </div>
 
   <pre><code>{{.Description}}</code></pre>
 
   <div class='metadata'>
-    <time>Release: {{.Release_date}}</time>
+    <time>Release: {{.ReleaseDate}}</time>
   </div>
 
 </div>
-{range .Movie}
+{{end}}
 {{end}}
 {{end}}

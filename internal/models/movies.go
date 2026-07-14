@@ -43,7 +43,8 @@ func (m *MovieModel) Insert(title string, description string, release_date time.
 
 // This will return a specific snippet based on its id.
 func (m *MovieModel) Get(id int) (Movie, error) {
-	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating, FROM movies
+	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating\
+	 FROM movies
 	WHERE id = ?`
 
 	row := m.DB.QueryRow(stmt, id)

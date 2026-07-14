@@ -30,7 +30,7 @@ func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 	files := []string{
 		"./ui/html/base.tmpl",
 		"./ui/html/partials/nav.tmpl",
-		"./ui/html/pages/detail.tmpl",
+		"./ui/html/pages/movies.tmpl",
 	}
 
 	ts, err := template.ParseFiles(files...)
@@ -116,12 +116,12 @@ func (app *application) movieCreate(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, fmt.Sprintf("/movies/%d", id), http.StatusSeeOther)
 }
 
-func (app *application) actorDetail(w http.ResponseWriter, r *http.Request) {
-	actorID, err := strconv.Atoi(r.PathValue("id"))
-	if err != nil || id < 1 {
+func (app *application) personDetail(w http.ResponseWriter, r *http.Request) {
+	personID, err := strconv.Atoi(r.PathValue("id"))
+	if err != nil || personID < 1 {
 		http.NotFound(w, r)
 		return
 	}
-	msg := fmt.Sprintf("Display a specific actor with ID %d...", id)
+	msg := fmt.Sprintf("Display a specific person with ID %d...", personID)
 	w.Write([]byte(msg))
 }
