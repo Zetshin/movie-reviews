@@ -3,8 +3,6 @@ package main
 import (
 	"errors"
 	"fmt"
-
-	"html/template"
 	"net/http"
 	"strconv"
 	"time"
@@ -26,26 +24,10 @@ func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-
-	files := []string{
-		"./ui/html/base.tmpl",
-		"./ui/html/partials/nav.tmpl",
-		"./ui/html/pages/movies.tmpl",
-	}
-
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
-	data := templateData{
+	app.render(w, r, http.StatusOK, "movies.tmpl", templateData{
 		Movies: movies,
-	}
-	err = ts.ExecuteTemplate(w, "base", data)
-	if err != nil {
-		app.serverError(w, r, err)
-	}
+	})
+
 }
 func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
@@ -62,25 +44,9 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	files := []string{
-		"./ui/html/base.tmpl",
-		"./ui/html/partials/nav.tmpl",
-		"./ui/html/pages/detail.tmpl",
-	}
-	ts, err := template.ParseFiles(files...)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	data := templateData{
+	app.render(w, r, http.StatusOK, "detail.tmpl", templateData{
 		Movie: movie,
-	}
-	// And then execute them. Notice how we are passing in the snippet
-	// data (a models.Snippet struct) as the final parameter?
-	err = ts.ExecuteTemplate(w, "base", data)
-	if err != nil {
-		app.serverError(w, r, err)
-	}
+	})
 
 }
 func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
