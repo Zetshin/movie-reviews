@@ -1,12 +1,13 @@
 {{define "title"}}Movie #{{.Movie.ID}}{{end}}
-
 {{define "main"}}
 {{with .Movie}}
+
 <div class='snippet'>
 
   <div class='metadata'>
     <strong>{{.Title}}</strong>
     <span>#{{.ID}}</span>
+    
   </div>
 
   <div class='poster'>
