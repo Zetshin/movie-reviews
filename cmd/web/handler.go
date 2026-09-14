@@ -11,6 +11,7 @@ import (
 )
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
+	panic("oops! something went wrong")
 
 }
 
@@ -24,11 +25,15 @@ func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-	app.render(w, r, http.StatusOK, "movies.tmpl", templateData{
-		Movies: movies,
-	})
-
+	// Call the newTemplateData() helper to get a templateData struct containing
+	// the 'default' data (which for now is just the current year), and add the
+	// snippets slice to it.
+	data := app.newTemplateData(r)
+	data.Movies = movies
+	// Pass the data to the render() helper as normal.
+	app.render(w, r, http.StatusOK, "movies.tmpl", data)
 }
+
 func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	movieID, err := strconv.Atoi(r.PathValue("movieID"))
 	if err != nil || movieID < 1 {
@@ -44,9 +49,9 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	app.render(w, r, http.StatusOK, "detail.tmpl", templateData{
-		Movie: movie,
-	})
+	data := app.newTemplateData(r)
+	data.Movie = movie
+	app.render(w, r, http.StatusOK, "detail.tmpl", data)
 
 }
 func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {

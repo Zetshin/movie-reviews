@@ -3,6 +3,7 @@ package main
 import (
 	"html/template"
 	"path/filepath"
+	"time"
 
 	"github.com/Zetshin/movie-reviews/internal/models"
 )
@@ -12,8 +13,22 @@ import (
 // At the moment it only contains one field, but we'll add more
 // to it as the project progresses.
 type templateData struct {
-	Movie  models.Movie
-	Movies []models.Movie
+	CurrentYear int
+	Movie       models.Movie
+	Movies      []models.Movie
+}
+
+// Create a humanDate function which returns a nicely formatted string
+// representation of a time.Time value.
+func humanDate(t time.Time) string {
+	return t.Format("02 Jan 2006 at 15:04")
+}
+
+// Initialize a template.FuncMap value and store it in a global variable. This is
+// essentially a string-keyed map which acts as a lookup table mapping names to
+// functions.
+var functions = template.FuncMap{
+	"humanDate": humanDate,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {
@@ -35,10 +50,11 @@ func newTemplateCache() (map[string]*template.Template, error) {
 		// Create a slice containing the filepaths for our base template, any
 		// partials and the page.
 		// Parse the base template file into a template set.
-		ts, err := template.ParseFiles("./ui/html/base.tmpl")
+		ts, err := template.New(name).Funcs(functions).ParseFiles("./ui/html/base.tmpl")
 		if err != nil {
 			return nil, err
 		}
+
 		// Call ParseGlob() *on this template set* to add any partials.
 		ts, err = ts.ParseGlob("./ui/html/partials/*.tmpl")
 		if err != nil {
