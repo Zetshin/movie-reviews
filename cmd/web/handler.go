@@ -74,12 +74,27 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 	w.Write([]byte(msg))
 }
 
-func (app *application) movieCreate(w http.ResponseWriter, r *http.Request) {
-	title := "The Evil Dead"
-	description := "Five friends vacation in a remote cabin where they discover an ancient book that unleashes terrifying demonic forces."
-	release_date := time.Date(1981, 10, 15, 0, 0, 0, 0, time.UTC)
-	poster_image := "the-evil-dead.jpg"
-	id, err := app.movies.Insert(title, description, release_date, poster_image)
+func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
+	data := app.newTemplateData(r)
+	app.render(w, r, http.StatusOK, "add.tmpl", data)
+}
+
+func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
+	err := r.ParseForm()
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	title := r.PostForm.Get("title")
+	description := r.PostForm.Get("description")
+	posterImage := r.PostForm.Get("poster_image") //ตอนนี้ไม่ได้แก้ที่โมเดลทีมันเก็บแค่ชื่อ
+	releaseDate, err := time.Parse("2006-01-02", r.PostForm.Get("release_date"))
+	if err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+
+	id, err := app.movies.Insert(title, description, releaseDate, posterImage)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

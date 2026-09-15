@@ -311,3 +311,16 @@ footer {
     color: #6A6C6F;
     text-align: center;
 }
+.movie-form {
+    display: flex;
+    gap: 40px;
+    align-items: flex-start;
+}
+
+.movie-info {
+    flex: 1;
+}
+
+.movie-poster {
+    width: 250px;
+}

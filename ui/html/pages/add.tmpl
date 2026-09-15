@@ -1,0 +1,29 @@
+{{define "title"}}Create a New Movie{{end}}
+
+{{define "main"}}
+<form action="/movies/add" method="POST">
+    <div>
+        <label>Title:</label>
+        <input type="text" name="title">
+    </div>
+
+    <div>
+        <label>Description:</label>
+        <textarea name="description"></textarea>
+    </div>
+
+    <div>
+        <label>Release Date:</label>
+        <input type="date" name="release_date">
+    </div>
+
+    <div>
+        <label>Poster Image:</label>
+        <input type="text" name="poster_image">
+    </div>
+
+    <div>
+        <input type="submit" value="Create Movie">
+    </div>
+</form>
+{{end}}
