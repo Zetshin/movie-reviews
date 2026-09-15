@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings" // New import
 	"time"
+	"unicode/utf8" // New import
 
 	"github.com/Zetshin/movie-reviews/internal/models"
 )
@@ -79,22 +81,48 @@ func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "add.tmpl", data)
 }
 
+type movieAddForm struct {
+	Title       string
+	Description string
+	ReleaseDate time.Time
+	PosterImage string
+	FieldErrors map[string]string
+}
+
 func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
 	err := r.ParseForm()
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	title := r.PostForm.Get("title")
-	description := r.PostForm.Get("description")
-	posterImage := r.PostForm.Get("poster_image") //ตอนนี้ไม่ได้แก้ที่โมเดลทีมันเก็บแค่ชื่อ
-	releaseDate, err := time.Parse("2006-01-02", r.PostForm.Get("release_date"))
+	releaseDate, err := time.Parse(
+		"2006-01-02",
+		r.PostForm.Get("release_date"),
+	)
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
 
-	id, err := app.movies.Insert(title, description, releaseDate, posterImage)
+	form := movieAddForm{
+		Title:       r.PostForm.Get("title"),
+		Description: r.PostForm.Get("description"),
+		PosterImage: r.PostForm.Get("poster_image"),
+		ReleaseDate: releaseDate,
+		FieldErrors: map[string]string{},
+	}
+	if strings.TrimSpace(form.Title) == "" {
+		form.FieldErrors["title"] = "This field cannot be blank"
+	} else if utf8.RuneCountInString(form.Title) > 100 {
+		form.FieldErrors["title"] = "This field cannot be more than 100 characters long"
+	}
+	if len(form.FieldErrors) > 0 {
+		data := app.newTemplateData(r)
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "add.tmpl", data)
+		return
+	}
+	id, err := app.movies.Insert(form.Title, form.Description, form.ReleaseDate, form.PosterImage)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

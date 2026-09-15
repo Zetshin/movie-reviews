@@ -16,6 +16,7 @@ type templateData struct {
 	CurrentYear int
 	Movie       models.Movie
 	Movies      []models.Movie
+	Form        any
 }
 
 // Create a humanDate function which returns a nicely formatted string
