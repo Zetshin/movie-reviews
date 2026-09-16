@@ -78,6 +78,8 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 
 func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
+
+	data.Form = movieAddForm{}
 	app.render(w, r, http.StatusOK, "add.tmpl", data)
 }
 
@@ -127,6 +129,7 @@ func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
+
 	http.Redirect(w, r, fmt.Sprintf("/movies/%d", id), http.StatusSeeOther)
 }
 

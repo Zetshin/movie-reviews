@@ -4,22 +4,29 @@
 <form action="/movies/add" method="POST">
     <div>
         <label>Title:</label>
-        <input type="text" name="title">
+        <!-- Use the `with` action to render the value of .Form.FieldErrors.title
+        if it is not empty. -->
+        {{with .Form.FieldErrors.title}}
+            <label class='error'>{{.}}</label>
+        {{end}}
+        <!-- repopulate the title data by setting the `value` attribute. -->
+        <input type='text' name='title' value='{{.Form.Title}}'>
+    </div>
     </div>
 
     <div>
         <label>Description:</label>
-        <textarea name="description"></textarea>
+        <textarea name="description">{{.Form.Description}}</textarea>
     </div>
 
     <div>
         <label>Release Date:</label>
-        <input type="date" name="release_date">
+        <input type="date" name="release_date" value='{{.Form.ReleaseDate}}'>
     </div>
 
     <div>
         <label>Poster Image:</label>
-        <input type="text" name="poster_image">
+        <input type="text" name="poster_image" value='{{.Form.PosterImage}}'>
     </div>
 
     <div>
