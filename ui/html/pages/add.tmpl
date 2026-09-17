@@ -21,7 +21,11 @@
 
     <div>
         <label>Release Date:</label>
-        <input type="date" name="release_date" value='{{.Form.ReleaseDate}}'>
+       
+        <input type="date" name="release_date" value='{{.Form.ReleaseDate}}'> 
+        {{with .Form.FieldErrors.release_date}}
+            <label class='error'>{{.}}</label>
+        {{end}}
     </div>
 
     <div>

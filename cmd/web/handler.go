@@ -4,12 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"strconv"
-	"strings" // New import
+	"strconv" // New import
 	"time"
-	"unicode/utf8" // New import
 
+	// New import
 	"github.com/Zetshin/movie-reviews/internal/models"
+	"github.com/Zetshin/movie-reviews/internal/validator"
 )
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
@@ -84,19 +84,34 @@ func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
 }
 
 type movieAddForm struct {
-	Title       string
-	Description string
-	ReleaseDate time.Time
-	PosterImage string
-	FieldErrors map[string]string
+	Title               string `form:"title"`
+	Description         string `form:"description"`
+	PosterImage         string `form:"poster_image"`
+	ReleaseDate         string `form:"release_date"`
+	validator.Validator `form:"-"`
 }
 
 func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
+
+	// Declare a new empty instance of the snippetCreateForm struct.
+	var form movieAddForm
+	err := app.decodePostForm(r, &form)
 	if err != nil {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
+
+	form.CheckField(validator.NotBlank(form.Title), "title", "This field cannot be blank")
+	form.CheckField(validator.MaxChars(form.Title, 100), "title", "This field cannot be more than 100 characters long")
+	form.CheckField(validator.NotBlank(form.ReleaseDate), "release_date", "This field cannot be blank")
+
+	if !form.Valid() {
+		data := app.newTemplateData(r)
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "add.tmpl", data)
+		return
+	}
+
 	releaseDate, err := time.Parse(
 		"2006-01-02",
 		r.PostForm.Get("release_date"),
@@ -105,26 +120,7 @@ func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-
-	form := movieAddForm{
-		Title:       r.PostForm.Get("title"),
-		Description: r.PostForm.Get("description"),
-		PosterImage: r.PostForm.Get("poster_image"),
-		ReleaseDate: releaseDate,
-		FieldErrors: map[string]string{},
-	}
-	if strings.TrimSpace(form.Title) == "" {
-		form.FieldErrors["title"] = "This field cannot be blank"
-	} else if utf8.RuneCountInString(form.Title) > 100 {
-		form.FieldErrors["title"] = "This field cannot be more than 100 characters long"
-	}
-	if len(form.FieldErrors) > 0 {
-		data := app.newTemplateData(r)
-		data.Form = form
-		app.render(w, r, http.StatusUnprocessableEntity, "add.tmpl", data)
-		return
-	}
-	id, err := app.movies.Insert(form.Title, form.Description, form.ReleaseDate, form.PosterImage)
+	id, err := app.movies.Insert(form.Title, form.Description, releaseDate, form.PosterImage)
 	if err != nil {
 		app.serverError(w, r, err)
 		return

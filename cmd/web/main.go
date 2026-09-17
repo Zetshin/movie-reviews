@@ -3,19 +3,22 @@ package main
 import (
 	"database/sql"
 	"flag"
+	"html/template"
 	"log/slog"
 	"net/http"
 	"os"
-	"html/template"
+
 	"github.com/Zetshin/movie-reviews/internal/models"
+	"github.com/go-playground/form/v4"
 
 	_ "github.com/go-sql-driver/mysql"
 )
 
 type application struct {
-	logger *slog.Logger
-	movies *models.MovieModel
+	logger        *slog.Logger
+	movies        *models.MovieModel
 	templateCache map[string]*template.Template
+	formDecoder   *form.Decoder
 }
 
 func main() {
@@ -39,11 +42,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	formDecoder := form.NewDecoder()
 
 	app := &application{
-		logger: logger,
-		movies: &models.MovieModel{DB: db},
+		logger:        logger,
+		movies:        &models.MovieModel{DB: db},
 		templateCache: templateCache,
+		formDecoder:   formDecoder,
 	}
 
 	logger.Info("starting server", slog.String("addr", *addr))
