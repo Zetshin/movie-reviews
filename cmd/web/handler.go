@@ -51,8 +51,10 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+
 	data := app.newTemplateData(r)
 	data.Movie = movie
+
 	app.render(w, r, http.StatusOK, "detail.tmpl", data)
 
 }
@@ -125,7 +127,7 @@ func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
 		app.serverError(w, r, err)
 		return
 	}
-
+	app.sessionManager.Put(r.Context(), "flash", "Movie successfully created!")
 	http.Redirect(w, r, fmt.Sprintf("/movies/%d", id), http.StatusSeeOther)
 }
 

@@ -88,3 +88,32 @@ func (m *MovieModel) Latest() ([]Movie, error) {
 	}
 	return movies, nil
 }
+
+func (m *MovieModel) TopPicks() ([]Movie, error) {
+	stmt := `SELECT id, title, poster_image, review_count, avg_rating FROM movies
+	WHERE avg_rating > 4.00 
+	ORDER By avg_rating DESC LIMIT 5
+	`
+	rows, err := m.DB.Query(stmt)
+	if err != nil {
+		return nil, err
+	}
+
+	defer rows.Close()
+
+	var movies []Movie
+	for rows.Next() {
+		var s Movie
+		err = rows.Scan(&s.ID, &s.Title, &s.PosterImage, &s.ReviewCount, &s.AvgRating)
+		if err != nil {
+			return nil, err
+		}
+		movies = append(movies, s)
+
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return movies, nil
+
+}
