@@ -18,6 +18,7 @@ type templateData struct {
 	Movies      []models.Movie
 	Form        any
 	Flash       string
+	Reviews 	[]models.Review
 }
 
 // Create a humanDate function which returns a nicely formatted string

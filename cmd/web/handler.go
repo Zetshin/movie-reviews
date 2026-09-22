@@ -140,3 +140,49 @@ func (app *application) personDetail(w http.ResponseWriter, r *http.Request) {
 	msg := fmt.Sprintf("Display a specific person with ID %d...", personID)
 	w.Write([]byte(msg))
 }
+
+func (app *application) movieReviews(w http.ResponseWriter, r *http.Request) {
+	movieID, err := strconv.Atoi(r.PathValue("movieID"))
+	if err != nil || movieID < 1 {
+		http.NotFound(w, r)
+		return
+	}
+	pageSize := 10
+	page := 1
+	pageString := r.URL.Query().Get("page")
+if pageString != "" {
+    page, err = strconv.Atoi(pageString)
+    if err != nil || page < 1 {
+        http.NotFound(w, r)
+        return
+    }
+}
+	sort := r.URL.Query().Get("sort")
+	totalReviews, err := app.reviews.CountByMovieID(movieID)
+	if err != nil {
+    	app.serverError(w, r, err)
+    	return
+	}
+	totalPages := (totalReviews + pageSize - 1) / pageSize
+	if page < 1 || (totalPages == 0 && page != 1) || (totalPages > 0 && page > totalPages) {
+    http.NotFound(w, r)
+    return
+}
+
+offset := (page - 1) * pageSize
+	reviews, err := app.reviews.ListByMovieID(movieID, sort, pageSize, offset)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	data := app.newTemplateData(r)
+		data.Reviews = reviews
+
+	app.render(w, r, http.StatusOK, "detail.tmpl", data)
+	
+
+}
+
+
+
