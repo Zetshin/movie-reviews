@@ -19,8 +19,8 @@ type PersonModel struct {
 }
 
 func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profileImage string) (int, error) {
-	stmt := `INSERT INTO person ( name, bio, birthDate, profileImage)
-	VALUES (?,?,?,?,?)`
+	stmt := `INSERT INTO persons ( name, bio, birth_date, profile_image)
+	VALUES (?,?,?,?)`
 	result, err := m.DB.Exec(stmt, name, bio, birthDate, profileImage)
 	if err != nil {
 		return 0, err

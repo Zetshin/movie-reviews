@@ -50,7 +50,7 @@ func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
 
 func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, error) {
 	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, movies.poster_image, movies.review_count, movies.avg_rating,movie_person.role
-	From movie
+	From movies
 	JOIN movie_person
 	ON movies.id = movie_person.movie_id
 	WHERE movie_person.person_id = ?`
