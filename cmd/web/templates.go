@@ -8,6 +8,15 @@ import (
 	"github.com/Zetshin/movie-reviews/internal/models"
 )
 
+type paginationData struct {
+	Page         int
+	TotalPages   int
+	TotalReviews int
+	Sort         string
+	PreviousPage int
+	NextPage     int
+}
+
 // Define a templateData type to act as the holding structure for
 // any dynamic data that we want to pass to our HTML templates.
 // At the moment it only contains one field, but we'll add more
@@ -18,7 +27,8 @@ type templateData struct {
 	Movies      []models.Movie
 	Form        any
 	Flash       string
-	Reviews 	[]models.Review
+	Reviews     []models.Review
+	Pagination  paginationData
 }
 
 // Create a humanDate function which returns a nicely formatted string

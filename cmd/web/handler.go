@@ -51,10 +51,45 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+	pageSize := 10
+	page := 1
+	pageString := r.URL.Query().Get("page")
+	if pageString != "" {
+		page, err = strconv.Atoi(pageString)
+		if err != nil || page < 1 {
+			http.NotFound(w, r)
+			return
+		}
+	}
+	sort := r.URL.Query().Get("sort")
+	totalReviews, err := app.reviews.CountByMovieID(movieID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	totalPages := (totalReviews + pageSize - 1) / pageSize
+	if page < 1 || (totalPages == 0 && page != 1) || (totalPages > 0 && page > totalPages) {
+		http.NotFound(w, r)
+		return
+	}
+
+	offset := (page - 1) * pageSize
+	reviews, err := app.reviews.ListByMovieID(movieID, sort, pageSize, offset)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 
 	data := app.newTemplateData(r)
+	data.Reviews = reviews
 	data.Movie = movie
-
+	data.Pagination.Page = page
+	data.Pagination.TotalPages = totalPages
+	data.Pagination.TotalReviews = totalReviews
+	data.Pagination.Sort = sort
+	data.Pagination.Page = page
+	data.Pagination.PreviousPage = page - 1
+	data.Pagination.NextPage = page + 1
 	app.render(w, r, http.StatusOK, "detail.tmpl", data)
 
 }
@@ -150,26 +185,26 @@ func (app *application) movieReviews(w http.ResponseWriter, r *http.Request) {
 	pageSize := 10
 	page := 1
 	pageString := r.URL.Query().Get("page")
-if pageString != "" {
-    page, err = strconv.Atoi(pageString)
-    if err != nil || page < 1 {
-        http.NotFound(w, r)
-        return
-    }
-}
+	if pageString != "" {
+		page, err = strconv.Atoi(pageString)
+		if err != nil || page < 1 {
+			http.NotFound(w, r)
+			return
+		}
+	}
 	sort := r.URL.Query().Get("sort")
 	totalReviews, err := app.reviews.CountByMovieID(movieID)
 	if err != nil {
-    	app.serverError(w, r, err)
-    	return
+		app.serverError(w, r, err)
+		return
 	}
 	totalPages := (totalReviews + pageSize - 1) / pageSize
 	if page < 1 || (totalPages == 0 && page != 1) || (totalPages > 0 && page > totalPages) {
-    http.NotFound(w, r)
-    return
-}
+		http.NotFound(w, r)
+		return
+	}
 
-offset := (page - 1) * pageSize
+	offset := (page - 1) * pageSize
 	reviews, err := app.reviews.ListByMovieID(movieID, sort, pageSize, offset)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -177,12 +212,8 @@ offset := (page - 1) * pageSize
 	}
 
 	data := app.newTemplateData(r)
-		data.Reviews = reviews
+	data.Reviews = reviews
 
 	app.render(w, r, http.StatusOK, "detail.tmpl", data)
-	
 
 }
-
-
-

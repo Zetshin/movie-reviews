@@ -58,6 +58,7 @@ func main() {
 		templateCache:  templateCache,
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
+		reviews:        &models.ReviewModel{DB: db},
 	}
 
 	logger.Info("starting server", slog.String("addr", *addr))

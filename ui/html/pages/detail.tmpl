@@ -1,25 +1,56 @@
 {{define "title"}}Movie #{{.Movie.ID}}{{end}}
+
 {{define "main"}}
 {{with .Movie}}
 
 <div class='snippet'>
 
-  <div class='metadata'>
-    <strong>{{.Title}}</strong>
-    <span>#{{.ID}}</span>
-    
-  </div>
+    <div class='metadata'>
+        <strong>{{.Title}}</strong>
+        <span>#{{.ID}}</span>
+    </div>
 
-  <div class='poster'>
-    <p>Poster: {{.PosterImage}}</p>
-  </div>
+    <div class='poster'>
+        <p>Poster: {{.PosterImage}}</p>
+    </div>
 
-  <pre><code>{{.Description}}</code></pre>
+    <pre><code>{{.Description}}</code></pre>
 
-  <div class='metadata'>
-    <time>Release: {{humanDate .ReleaseDate}}</time>
-  </div>
+    <div class='metadata'>
+        <time>Release: {{humanDate .ReleaseDate}}</time>
+    </div>
+
+    <h2>Reviews</h2>
+
+    {{if $.Reviews}}
+        {{range $.Reviews}}
+            <div class="review">
+                <p>Rating: {{.Rating}}/5</p>
+                <p>{{.Review}}</p>
+                <p>Likes: {{.LikeCount}}</p>
+            </div>
+        {{end}}
+
+       
+
+    {{else}}
+        <p>No reviews yet.</p>
+    {{end}}
 
 </div>
+<div class="pagination">
+    {{if gt $.Pagination.Page 1}}
+        <a href="?page={{$.Pagination.PreviousPage}}">Previous</a>
+    {{end}}
+
+    <span>
+        Page {{$.Pagination.Page}} of {{$.Pagination.TotalPages}}
+    </span>
+
+    {{if lt $.Pagination.Page $.Pagination.TotalPages}}
+        <a href="?page={{$.Pagination.NextPage}}">Next</a>
+    {{end}}
+</div>
+
 {{end}}
 {{end}}

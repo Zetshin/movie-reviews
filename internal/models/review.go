@@ -30,7 +30,7 @@ func (m *ReviewModel) ListByMovieID(
 
 	switch sort {
 	case "popular":
-		orderBy = "ORDER BY like_count DESC, r.created_atผ DESC, r.id DESC"
+		orderBy = "ORDER BY like_count DESC, r.created_at DESC, r.id DESC"
 
 	default:
 		orderBy = "ORDER BY r.created_at DESC, r.id DESC"
@@ -98,10 +98,10 @@ func (m *ReviewModel) GetRandom() (Review, error) {
 }
 
 // This will insert a new snippet into the database.
-func (m *ReviewModel) Insert(movieID, userID int, rating float64, reviewText string) (int, error) {
+func (m *ReviewModel) Insert(movieID, userID int, rating int, reviewText string) (int, error) {
 	stmt := `INSERT INTO reviews (movie_id, user_id, rating, review_text)
 	VALUES(?,?,?,?)`
-	result, err := m.DB.Exec(stmt, movieID, userID, rating,	reviewText)
+	result, err := m.DB.Exec(stmt, movieID, userID, rating, reviewText)
 	if err != nil {
 		return 0, err
 	}
@@ -118,7 +118,7 @@ func (m *ReviewModel) Insert(movieID, userID int, rating float64, reviewText str
 }
 
 func (m *ReviewModel) Delete(reviewID int) error {
-    stmt := `DELETE FROM reviews WHERE id = ?`
+	stmt := `DELETE FROM reviews WHERE id = ?`
 
 	result, err := m.DB.Exec(stmt, reviewID)
 	if err != nil {
@@ -126,10 +126,29 @@ func (m *ReviewModel) Delete(reviewID int) error {
 	}
 	affected, err := result.RowsAffected()
 	if err != nil {
-		return  err
+		return err
 	}
 	if affected == 0 {
-    return ErrNoRecord
-}  
+		return ErrNoRecord
+	}
+	return nil
+}
+
+
+func (m *ReviewModel) Update(rating int, reviewText string ,reviewID int) error {
+	stmt := `UPDATE reviews SET rating = ?, review_text = ?
+			 WHERE id = ?;`
+
+	result, err := m.DB.Exec(stmt, rating, reviewText, reviewID)
+	if err != nil {
+		return err
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if affected == 0 {
+		return ErrNoRecord
+	}
 	return nil
 }
