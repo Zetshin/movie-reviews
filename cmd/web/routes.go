@@ -24,6 +24,12 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /movies/{movieID}/review", dynamic.ThenFunc(app.movieReviewPost)) //ส่งรีวิว
 	mux.Handle("GET /persons/{$}", dynamic.ThenFunc(app.personDetail))
 	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	   // Add the five new routes, all of which use our 'dynamic' middleware chain.
+    mux.Handle("GET /user/signup", dynamic.ThenFunc(app.userSignup))
+    mux.Handle("POST /user/signup", dynamic.ThenFunc(app.userSignupPost))
+    mux.Handle("GET /user/login", dynamic.ThenFunc(app.userLogin))
+    mux.Handle("POST /user/login", dynamic.ThenFunc(app.userLoginPost))
+    mux.Handle("POST /user/logout", dynamic.ThenFunc(app.userLogoutPost))
 	// Return the 'standard' middleware chain followed by the servemux.
 	
 	return standard.Then(mux)
