@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"database/sql"
 	"flag"
 	"html/template"
@@ -52,6 +53,7 @@ func main() {
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
 
+	sessionManager.Cookie.Secure = true
 	app := &application{
 		logger:         logger,
 		movies:         &models.MovieModel{DB: db},
@@ -61,6 +63,9 @@ func main() {
 		reviews:        &models.ReviewModel{DB: db},
 	}
 
+	tlsConfig := &tls.Config{
+		CurvePreferences: []tls.CurveID{tls.X25519, tls.CurveP256},
+	}
 	srv := &http.Server{
 		Addr:    *addr,
 		Handler: app.routes(),
@@ -68,10 +73,14 @@ func main() {
 		// log entries at the Error level, and assign it to the ErrorLog field. If
 		// you would prefer to log the server errors at Warn level instead, you
 		// could pass slog.LevelWarn as the final parameter.
-		ErrorLog: slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		ErrorLog:     slog.NewLogLogger(logger.Handler(), slog.LevelError),
+		TLSConfig:    tlsConfig,
+		IdleTimeout:  time.Minute,
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 10 * time.Second,
 	}
 	logger.Info("starting server", "addr", srv.Addr)
-	err = srv.ListenAndServe()
+	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
 	logger.Error(err.Error())
 	os.Exit(1)
 }

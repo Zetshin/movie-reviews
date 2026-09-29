@@ -29,7 +29,7 @@ func (app *application) render(w http.ResponseWriter, r *http.Request, status in
 	}
 	// If the template is written to the buffer without any errors, it's safe
 	// to go ahead and write the HTTP status code to http.ResponseWriter.
-	w.Header().Set("Content-Length", "this isn't an integer!")
+
 	w.WriteHeader(status)
 	// Write the contents of the buffer to the http.ResponseWriter. Note: this
 	// is another time where we pass our http.ResponseWriter to a function that
