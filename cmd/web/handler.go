@@ -218,8 +218,19 @@ func (app *application) movieReviews(w http.ResponseWriter, r *http.Request) {
 
 }
 
+// Create a new userSignupForm struct.
+type userSignupForm struct {
+    Name                string `form:"name"`
+    Email               string `form:"email"`
+    Password            string `form:"password"`
+    validator.Validator `form:"-"`
+}
+
+// Update the handler so it displays the signup page.
 func (app *application) userSignup(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "Display a form for signing up a new user...")
+    data := app.newTemplateData(r)
+    data.Form = userSignupForm{}
+    app.render(w, r, http.StatusOK, "signup.tmpl", data)
 }
 func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, "Create a new user...")
