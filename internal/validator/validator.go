@@ -1,6 +1,7 @@
 package validator
 
 import (
+	"regexp" // New import
 	"slices"
 	"strings"
 	"unicode/utf8"
@@ -9,14 +10,21 @@ import (
 // Define a new Validator struct which contains a map of validation error messages
 // for our form fields.
 type Validator struct {
-	FieldErrors map[string]string
+	NonFieldErrors []string
+	FieldErrors    map[string]string
 }
 
-// Valid() returns true if the FieldErrors map doesn't contain any entries.
+// Update the Valid() method to also check that the NonFieldErrors slice is
+// empty.
 func (v *Validator) Valid() bool {
-	return len(v.FieldErrors) == 0
+	return len(v.FieldErrors) == 0 && len(v.NonFieldErrors) == 0
 }
 
+// Create an AddNonFieldError() helper for adding error messages to the new
+// NonFieldErrors slice.
+func (v *Validator) AddNonFieldError(message string) {
+	v.NonFieldErrors = append(v.NonFieldErrors, message)
+}
 func (v *Validator) AddFieldError(key, message string) {
 	// Note: We need to initialize the map first, if it isn't already
 	// initialized.
@@ -52,4 +60,22 @@ func MaxChars(value string, n int) bool {
 // values.
 func PermittedValue[T comparable](value T, permittedValues ...T) bool {
 	return slices.Contains(permittedValues, value)
+}
+
+var EmailRX = regexp.MustCompile("^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$")
+
+// MinChars() returns true if a value contains n characters or more.
+func MinChars(value string, n int) bool {
+	return utf8.RuneCountInString(value) >= n
+}
+
+// MaxBytes() returns true if a value contains n bytes or less.
+func MaxBytes(value string, n int) bool {
+	return len(value) <= n
+}
+
+// Matches() returns true if a value matches a provided compiled regular
+// expression pattern.
+func Matches(value string, rx *regexp.Regexp) bool {
+	return rx.MatchString(value)
 }

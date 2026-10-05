@@ -22,13 +22,15 @@ type paginationData struct {
 // At the moment it only contains one field, but we'll add more
 // to it as the project progresses.
 type templateData struct {
-	CurrentYear int
-	Movie       models.Movie
-	Movies      []models.Movie
-	Form        any
-	Flash       string
-	Reviews     []models.Review
-	Pagination  paginationData
+	CurrentYear     int
+	Movie           models.Movie
+	Movies          []models.Movie
+	Form            any
+	Flash           string
+	Reviews         []models.Review
+	Pagination      paginationData
+	IsAuthenticated bool // Add an IsAuthenticated field to the templateData struct.
+	IsAdmin         bool
 }
 
 // Create a humanDate function which returns a nicely formatted string
