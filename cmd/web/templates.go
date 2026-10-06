@@ -31,6 +31,7 @@ type templateData struct {
 	Pagination      paginationData
 	IsAuthenticated bool // Add an IsAuthenticated field to the templateData struct.
 	IsAdmin         bool
+	CSRFToken       string
 }
 
 // Create a humanDate function which returns a nicely formatted string
