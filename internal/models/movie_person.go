@@ -23,7 +23,7 @@ type MoviePersonModel struct {
 }
 
 func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
-	stmt := `SELECT persons.name, persons.profile_image, movie_person.role
+	stmt := `SELECT persons.name, COALESCE(persons.profile_image, ''), movie_person.role
 	FROM persons
 	JOIN movie_person 
 	ON persons.id = movie_person.person_id
@@ -49,7 +49,7 @@ func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
 }
 
 func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, error) {
-	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, movies.poster_image, movies.review_count, movies.avg_rating,movie_person.role
+	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, COALESCE(movies.poster_image, ''), movies.review_count, movies.avg_rating,movie_person.role
 	From movies
 	JOIN movie_person
 	ON movies.id = movie_person.movie_id

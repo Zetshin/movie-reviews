@@ -17,10 +17,14 @@ type paginationData struct {
 	NextPage     int
 }
 
+type HomeTopPick struct {
+	Movie         models.Movie
+	ReviewPreview *models.Review
+}
+
 // Define a templateData type to act as the holding structure for
 // any dynamic data that we want to pass to our HTML templates.
-// At the moment it only contains one field, but we'll add more
-// to it as the project progresses.
+
 type templateData struct {
 	CurrentYear     int
 	Movie           models.Movie
@@ -32,6 +36,8 @@ type templateData struct {
 	IsAuthenticated bool // Add an IsAuthenticated field to the templateData struct.
 	IsAdmin         bool
 	CSRFToken       string
+	TopPicks        []HomeTopPick
+	Actors          []models.Person
 }
 
 // Create a humanDate function which returns a nicely formatted string

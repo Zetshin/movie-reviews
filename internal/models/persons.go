@@ -18,6 +18,30 @@ type PersonModel struct {
 	DB *sql.DB
 }
 
+// Latest returns up to limit persons ordered by descending ID.
+func (m *PersonModel) Latest(limit int) ([]Person, error) {
+	stmt := `SELECT id, name, COALESCE(profile_image, '') FROM persons
+	ORDER BY id DESC LIMIT ?`
+	rows, err := m.DB.Query(stmt, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var persons []Person
+	for rows.Next() {
+		var person Person
+		if err := rows.Scan(&person.ID, &person.Name, &person.ProfileImage); err != nil {
+			return nil, err
+		}
+		persons = append(persons, person)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return persons, nil
+}
+
 func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profileImage string) (int, error) {
 	stmt := `INSERT INTO persons ( name, bio, birth_date, profile_image)
 	VALUES (?,?,?,?)`
@@ -33,7 +57,7 @@ func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profi
 }
 
 func (m *PersonModel) Get(id int) (Person, error) {
-	stmt := `SELECT id, name, bio, birthDate, profileImage FROM persons
+	stmt := `SELECT id, name, bio, birth_date, COALESCE(profile_image, '') FROM persons
 	WHERE id = ?`
 	row := m.DB.QueryRow(stmt, id)
 	var p Person

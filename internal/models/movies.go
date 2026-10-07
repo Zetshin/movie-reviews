@@ -43,7 +43,7 @@ func (m *MovieModel) Insert(title string, description string, release_date time.
 
 // This will return a specific snippet based on its id.
 func (m *MovieModel) Get(id int) (Movie, error) {
-	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating
+	stmt := `SELECT id, title, description, release_date, COALESCE(poster_image, ''), review_count, avg_rating
 	FROM movies
 	WHERE id = ?`
 
@@ -63,11 +63,12 @@ func (m *MovieModel) Get(id int) (Movie, error) {
 
 }
 
-// This will return the 10 most recently created snippets.
-func (m *MovieModel) Latest() ([]Movie, error) {
-	stmt := `SELECT id, title, description, release_date, poster_image, review_count, avg_rating FROM movies
-	ORDER BY id DESC LIMIT 10`
-	rows, err := m.DB.Query(stmt)
+// Latest returns up to limit movies ordered by descending ID.
+func (m *MovieModel) Latest(limit int) ([]Movie, error) {
+	stmt := `SELECT id, title, description, release_date, COALESCE(poster_image, ''), review_count, avg_rating FROM movies
+	ORDER BY id DESC LIMIT ?`
+	rows, err := m.DB.Query(stmt, limit)
+
 	if err != nil {
 		return nil, err
 	}
@@ -90,7 +91,7 @@ func (m *MovieModel) Latest() ([]Movie, error) {
 }
 
 func (m *MovieModel) TopPicks() ([]Movie, error) {
-	stmt := `SELECT id, title, poster_image, review_count, avg_rating FROM movies
+	stmt := `SELECT id, title, COALESCE(poster_image, ''), review_count, avg_rating FROM movies
 	WHERE avg_rating > 4.00 
 	ORDER By avg_rating DESC LIMIT 5
 	`

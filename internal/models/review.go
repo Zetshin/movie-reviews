@@ -2,6 +2,7 @@ package models
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -10,6 +11,7 @@ type Review struct {
 	ID        int
 	MovieID   int
 	UserID    int
+	Username  string
 	Rating    int
 	Review    string
 	CreatedAt time.Time
@@ -81,17 +83,24 @@ func (m *ReviewModel) CountByMovieID(movieID int) (int, error) {
 	return count, nil
 }
 
-func (m *ReviewModel) GetRandom() (Review, error) {
-	stmt := `SELECT id, movie_id, user_id, rating, review_text, created_at, updated_at
-			 FROM reviews
-			 WHERE rating > 3
-			 ORDER BY RAND()
-			 LIMIT 1;`
+func (m *ReviewModel) GetRandom(movieID int) (Review, error) {
+	stmt := `SELECT r.id, r.movie_id, r.user_id, r.rating,
+                r.review_text, r.created_at, r.updated_at,
+                u.username
+         FROM reviews AS r
+         JOIN users AS u ON r.user_id = u.id
+         WHERE r.movie_id = ?
+         AND   r.rating >= 3
+         ORDER BY RAND()
+         LIMIT 1`
 
-	row := m.DB.QueryRow(stmt)
+	row := m.DB.QueryRow(stmt, movieID)
 	var r Review
-	err := row.Scan(&r.ID, &r.MovieID, &r.UserID, &r.Rating, &r.Review, &r.CreatedAt, &r.UpdatedAt)
+	err := row.Scan(&r.ID, &r.MovieID, &r.UserID, &r.Rating, &r.Review, &r.CreatedAt, &r.UpdatedAt, &r.Username)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Review{}, ErrNoRecord
+		}
 		return Review{}, err
 	}
 	return r, nil
@@ -134,8 +143,7 @@ func (m *ReviewModel) Delete(reviewID int) error {
 	return nil
 }
 
-
-func (m *ReviewModel) Update(rating int, reviewText string ,reviewID int) error {
+func (m *ReviewModel) Update(rating int, reviewText string, reviewID int) error {
 	stmt := `UPDATE reviews SET rating = ?, review_text = ?
 			 WHERE id = ?;`
 

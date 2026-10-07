@@ -25,6 +25,7 @@ type application struct {
 	formDecoder    *form.Decoder
 	sessionManager *scs.SessionManager
 	reviews        *models.ReviewModel
+	persons        *models.PersonModel
 }
 
 func main() {
@@ -63,6 +64,7 @@ func main() {
 		formDecoder:    formDecoder,
 		sessionManager: sessionManager,
 		reviews:        &models.ReviewModel{DB: db},
+		persons:        &models.PersonModel{DB: db},
 	}
 
 	tlsConfig := &tls.Config{

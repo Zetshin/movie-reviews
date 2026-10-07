@@ -13,15 +13,63 @@ import (
 )
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
+	// หนังล่าสุด: ใช้ทั้ง Hero และ New Movies
+	movies, err := app.movies.Latest(6)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 
+	// หนังที่ผ่านเกณฑ์ Top Picks
+	topMovies, err := app.movies.TopPicks()
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// จับคู่หนังแต่ละเรื่องกับรีวิวของเรื่องนั้น
+	var topPicks []HomeTopPick
+
+	for _, movie := range topMovies {
+		pick := HomeTopPick{
+			Movie: movie,
+		}
+
+		review, err := app.reviews.GetRandom(movie.ID)
+		if err != nil {
+			if !errors.Is(err, models.ErrNoRecord) {
+				app.serverError(w, r, err)
+				return
+			}
+			// ไม่มีรีวิวผ่านเงื่อนไข: ReviewPreview เป็น nil
+		} else {
+			pick.ReviewPreview = &review
+		}
+
+		topPicks = append(topPicks, pick)
+	}
+
+	// บุคคลล่าสุด: ยังไม่ได้กรองบทบาทนักแสดง
+	actors, err := app.persons.Latest(6)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+
+	// ส่งข้อมูลทั้งหมดให้ Home
+	data := app.newTemplateData(r)
+	data.Movies = movies
+	data.TopPicks = topPicks
+	data.Actors = actors
+
+	app.render(w, r, http.StatusOK, "home.tmpl", data)
 }
-
 func (app *application) profile(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("Profile :D"))
 }
 func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "Go")
-	movies, err := app.movies.Latest()
+	movies, err := app.movies.Latest(10)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
