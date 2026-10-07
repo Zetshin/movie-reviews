@@ -90,10 +90,47 @@ func (m *MovieModel) Latest(limit int) ([]Movie, error) {
 	return movies, nil
 }
 
+// UpdateReviewStats recalculates a movie's stored statistics from all its reviews.
+// ReviewModel also refreshes these statistics inside each write transaction.
+func (m *MovieModel) UpdateReviewStats(movieID int) error {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := lockMovieForReview(tx, movieID); err != nil {
+		return err
+	}
+	if err := updateReviewStats(tx, movieID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// Serialize review changes for one movie before recalculating its statistics.
+func lockMovieForReview(tx *sql.Tx, movieID int) error {
+	var id int
+	err := tx.QueryRow(`SELECT id FROM movies WHERE id = ? FOR UPDATE`, movieID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNoRecord
+	}
+	return err
+}
+
+func updateReviewStats(tx *sql.Tx, movieID int) error {
+	stmt := `UPDATE movies
+	SET review_count = (SELECT COUNT(*) FROM reviews WHERE movie_id = ?),
+		avg_rating = (SELECT COALESCE(AVG(rating), 0) FROM reviews WHERE movie_id = ?)
+	WHERE id = ?`
+
+	_, err := tx.Exec(stmt, movieID, movieID, movieID)
+	return err
+}
+
 func (m *MovieModel) TopPicks() ([]Movie, error) {
 	stmt := `SELECT id, title, COALESCE(poster_image, ''), review_count, avg_rating FROM movies
-	WHERE avg_rating > 4.00 
-	ORDER By avg_rating DESC LIMIT 5
+	WHERE avg_rating > 4.00 AND review_count >= 5
+	ORDER BY avg_rating DESC, review_count DESC, id DESC LIMIT 3
 	`
 	rows, err := m.DB.Query(stmt)
 	if err != nil {
@@ -117,4 +154,26 @@ func (m *MovieModel) TopPicks() ([]Movie, error) {
 	}
 	return movies, nil
 
+}
+
+func (m *MovieModel) Search(query string, limit int) ([]Movie, error) {
+	if limit < 1 || limit > 100 {
+		return nil, errors.New("search limit must be between 1 and 100")
+	}
+	stmt := `SELECT id, title, release_date, COALESCE(poster_image, ''), COALESCE(avg_rating, 0)
+ FROM movies WHERE title LIKE ? ORDER BY title ASC, id DESC LIMIT ?`
+	rows, err := m.DB.Query(stmt, "%"+query+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	movies := make([]Movie, 0)
+	for rows.Next() {
+		var movie Movie
+		if err := rows.Scan(&movie.ID, &movie.Title, &movie.ReleaseDate, &movie.PosterImage, &movie.AvgRating); err != nil {
+			return nil, err
+		}
+		movies = append(movies, movie)
+	}
+	return movies, rows.Err()
 }

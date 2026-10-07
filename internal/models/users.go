@@ -26,6 +26,20 @@ type UserModel struct {
 	DB *sql.DB
 }
 
+// Get returns profile information without loading the user's password hash.
+func (m *UserModel) Get(id int) (User, error) {
+	stmt := `SELECT id, username, email, created, is_admin FROM users WHERE id = ?`
+	var user User
+	err := m.DB.QueryRow(stmt, id).Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.IsAdmin)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return User{}, ErrNoRecord
+		}
+		return User{}, err
+	}
+	return user, nil
+}
+
 // We'll use the Insert method to add a new record to the "users" table.
 func (m *UserModel) Insert(name, email, password string) error {
 	// Create a bcrypt hash of the plain-text password.

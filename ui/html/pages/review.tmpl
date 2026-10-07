@@ -1,0 +1,28 @@
+{{define "title"}}Review {{.Movie.Title}}{{end}}
+
+{{define "main"}}
+<h2>Write a review for {{.Movie.Title}}</h2>
+<p><a href="/movies/{{.Movie.ID}}">Back to movie</a></p>
+<form action="/movies/{{.Movie.ID}}/review" method="POST">
+    <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+    <div>
+        <label for="rating">Your rating</label>
+        {{with .Form.FieldErrors.rating}}<p class="error" id="rating-error">{{.}}</p>{{end}}
+        <select id="rating" name="rating" required {{with .Form.FieldErrors.rating}}aria-invalid="true" aria-describedby="rating-error"{{end}}>
+            <option value="">Choose a rating</option>
+            <option value="1" {{if eq .Form.Rating 1}}selected{{end}}>1 / 5</option>
+            <option value="2" {{if eq .Form.Rating 2}}selected{{end}}>2 / 5</option>
+            <option value="3" {{if eq .Form.Rating 3}}selected{{end}}>3 / 5</option>
+            <option value="4" {{if eq .Form.Rating 4}}selected{{end}}>4 / 5</option>
+            <option value="5" {{if eq .Form.Rating 5}}selected{{end}}>5 / 5</option>
+        </select>
+    </div>
+    <div>
+        <label for="review-text">Your review</label>
+        {{with .Form.FieldErrors.review_text}}<p class="error" id="review-error">{{.}}</p>{{end}}
+        <textarea id="review-text" name="review_text" maxlength="2000" required {{with .Form.FieldErrors.review_text}}aria-invalid="true" aria-describedby="review-error"{{end}}>{{.Form.ReviewText}}</textarea>
+        <p>Up to 2000 characters.</p>
+    </div>
+    <input type="submit" value="Publish review">
+</form>
+{{end}}

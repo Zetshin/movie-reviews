@@ -57,11 +57,12 @@ func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profi
 }
 
 func (m *PersonModel) Get(id int) (Person, error) {
-	stmt := `SELECT id, name, bio, birth_date, COALESCE(profile_image, '') FROM persons
+	stmt := `SELECT id, name, COALESCE(bio, ''), birth_date, COALESCE(profile_image, '') FROM persons
 	WHERE id = ?`
 	row := m.DB.QueryRow(stmt, id)
 	var p Person
-	err := row.Scan(&p.ID, &p.Name, &p.Bio, &p.BirthDate, &p.ProfileImage)
+	var birthDate sql.NullTime
+	err := row.Scan(&p.ID, &p.Name, &p.Bio, &birthDate, &p.ProfileImage)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Person{}, ErrNoRecord
@@ -69,5 +70,29 @@ func (m *PersonModel) Get(id int) (Person, error) {
 			return Person{}, err
 		}
 	}
+	if birthDate.Valid {
+		p.BirthDate = birthDate.Time
+	}
 	return p, nil
+}
+
+// Search returns people matching a name for the search dropdown.
+func (m *PersonModel) Search(query string, limit int) ([]Person, error) {
+	if limit < 1 || limit > 100 {
+		return nil, errors.New("search limit must be between 1 and 100")
+	}
+	rows, err := m.DB.Query(`SELECT id, name, COALESCE(profile_image, '') FROM persons WHERE name LIKE ? ORDER BY name ASC, id DESC LIMIT ?`, "%"+query+"%", limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	persons := make([]Person, 0)
+	for rows.Next() {
+		var person Person
+		if err := rows.Scan(&person.ID, &person.Name, &person.ProfileImage); err != nil {
+			return nil, err
+		}
+		persons = append(persons, person)
+	}
+	return persons, rows.Err()
 }

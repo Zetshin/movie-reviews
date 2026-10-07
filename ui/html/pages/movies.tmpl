@@ -1,27 +1,12 @@
-{{define "title"}}Movie #{{.Movie.ID}}{{end}}
-
+{{define "title"}}Movies{{end}}
 {{define "main"}}
-{{if .Movies}}
-{{range.Movies}}
-<div class='snippet'>
-
-  <div class='metadata'>
-    <strong>{{.Title}}</strong>
-    <span>#{{.ID}}</span>
-  </div>
-
-  <div class='poster'>
-    <p>Poster: {{.PosterImage}}</p>
-  </div>
-
-  <pre><code>{{.Description}}</code></pre>
-
-  <div class='metadata'>
- 
-    <time>Release: {{humanDate .ReleaseDate}}</time>
-  </div>
-
+<div class="page-heading"><div><p class="eyebrow">FRESH ON THE SCREEN</p><h1>Find your next favorite.</h1><p class="muted">The latest additions to MovieClub TH.</p></div>{{if and .IsAuthenticated .IsAdmin}}<a class="button gold" href="/movies/add">Add movie</a>{{end}}</div>
+<div class="catalog-grid">
+{{range .Movies}}
+<a class="movie-card" href="/movies/{{.ID}}">
+<div class="poster"><span class="poster-fallback">MOVIE<br><b>CLUB TH</b></span>{{if .PosterImage}}<img src="{{.PosterImage}}" alt="{{.Title}} poster" loading="lazy">{{end}}</div>
+<div class="card-copy"><h2>{{.Title}}</h2><div class="card-meta"><span>{{if not .ReleaseDate.IsZero}}{{.ReleaseDate.Format "2006"}}{{else}}Year unavailable{{end}}</span><span class="rating">★ {{.AvgRating}} <small>/ 5</small></span></div></div>
+</a>
+{{else}}<p class="empty-state">No movies yet. Check back soon.</p>{{end}}
 </div>
-{{end}}
-{{end}}
 {{end}}

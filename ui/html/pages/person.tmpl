@@ -1,0 +1,10 @@
+{{define "title"}}{{.Person.Name}}{{end}}
+{{define "main"}}
+<p class="breadcrumb"><a href="/#actors">← People on Home</a></p>
+{{with .Person}}
+<section class="movie-detail">
+<div class="poster detail-poster"><span class="poster-fallback" aria-hidden="true">◎</span>{{if .ProfileImage}}<img src="{{.ProfileImage}}" alt="{{.Name}}">{{end}}</div>
+<div><p class="eyebrow">PEOPLE IN FILM</p><h1>{{.Name}}</h1>{{if not .BirthDate.IsZero}}<p class="muted">Born {{.BirthDate.Format "02 January 2006"}}</p>{{end}}<h2>Biography</h2><p class="description">{{if .Bio}}{{.Bio}}{{else}}No biography available yet.{{end}}</p></div>
+</section>
+{{end}}
+{{end}}

@@ -26,6 +26,8 @@ type HomeTopPick struct {
 // any dynamic data that we want to pass to our HTML templates.
 
 type templateData struct {
+	Person          models.Person
+	User            models.User
 	CurrentYear     int
 	Movie           models.Movie
 	Movies          []models.Movie

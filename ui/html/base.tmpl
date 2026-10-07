@@ -1,31 +1,24 @@
 {{define "base"}}
 <!doctype html>
-<html lang='en'>
+<html lang="en">
 <head>
-<meta charset='utf-8'>
-<title>{{template "title" .}} - Snippetbox</title>
-<!-- Link to the CSS stylesheet and favicon -->
-<link rel='stylesheet' href='/static/css/main.css'>
-<link rel='shortcut icon' href='/static/img/favicon.ico' type='image/x-icon'>
-<!-- Also link to some fonts hosted by Google -->
-<link rel='stylesheet' href='https://fonts.googleapis.com/css?family=Ubuntu+Mono:400,700'>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{template "title" .}} · MovieClub TH</title>
+<link rel="stylesheet" href="/static/css/home.css">
+<link rel="stylesheet" href="/static/css/site.css">
+<link rel="icon" href="/static/img/favicon.ico">
+<script src="/static/js/main.js" defer></script>
+<script src="/static/js/home.js" defer></script>
 </head>
-<body>
-<header>
-<h1><a href='/'>Snippetbox</a></h1>
-</header>
+<body class="inner-page">
+<a class="skip-link" href="#content">Skip to content</a>
 {{template "nav" .}}
-  <main>
-            <!-- Display the flash message if one exists -->
-            {{with .Flash}}
-                <div class='flash'>{{.}}</div>
-            {{end}}
-            {{template "main" .}}
-        </main>
-<footer>
-Powered by <a href='https://go.dev/'>Go</a> in {{.CurrentYear}}
-</footer>
-<script src='/static/js/main.js' type='text/javascript'></script>
+<main id="content" class="page-content">
+{{with .Flash}}<div class="flash" role="status">{{.}}</div>{{end}}
+{{template "main" .}}
+</main>
+<footer class="site-footer"><a class="brand" href="/">Movie<span>Club</span> TH.</a><p>A good film stays with you.</p><span>© {{.CurrentYear}} MovieClub TH</span></footer>
 </body>
 </html>
 {{end}}

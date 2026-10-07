@@ -1,16 +1,57 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv" // New import
+	"strings"
 	"time"
 
 	// New import
 	"github.com/Zetshin/movie-reviews/internal/models"
 	"github.com/Zetshin/movie-reviews/internal/validator"
 )
+
+// movieSearch returns up to six titles for the Home dropdown.
+func (app *application) movieSearch(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if !validator.MaxChars(query, 100) {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	type result struct {
+		ID          int    `json:"id"`
+		Title       string `json:"title"`
+		ReleaseYear string `json:"release_year"`
+		PosterImage string `json:"poster_image"`
+		AvgRating   string `json:"avg_rating"`
+	}
+	results := make([]result, 0)
+	if query != "" {
+		movies, err := app.movies.Search(query, 6)
+		if err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		for _, movie := range movies {
+			year := ""
+			if !movie.ReleaseDate.IsZero() {
+				year = movie.ReleaseDate.Format("2006")
+			}
+			results = append(results, result{movie.ID, movie.Title, year, movie.PosterImage, movie.AvgRating})
+		}
+	}
+	payload, err := json.Marshal(results)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(payload)
+}
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	// หนังล่าสุด: ใช้ทั้ง Hero และ New Movies
@@ -65,7 +106,24 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 	app.render(w, r, http.StatusOK, "home.tmpl", data)
 }
 func (app *application) profile(w http.ResponseWriter, r *http.Request) {
-	w.Write([]byte("Profile :D"))
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	if userID < 1 {
+		http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+		return
+	}
+	user, err := app.users.Get(userID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			app.sessionManager.Remove(r.Context(), "authenticatedUserID")
+			http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	data := app.newTemplateData(r)
+	data.User = user
+	app.render(w, r, http.StatusOK, "profile.tmpl", data)
 }
 func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
 	w.Header().Add("Server", "Go")
@@ -146,8 +204,25 @@ func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	msg := fmt.Sprintf("Display a specific review for ID %d..", movieID)
-	w.Write([]byte(msg))
+	movie, err := app.movies.Get(movieID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	data := app.newTemplateData(r)
+	data.Movie = movie
+	data.Form = movieReviewForm{}
+	app.render(w, r, http.StatusOK, "review.tmpl", data)
+}
+
+type movieReviewForm struct {
+	Rating              int    `form:"rating"`
+	ReviewText          string `form:"review_text"`
+	validator.Validator `form:"-"`
 }
 
 func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) {
@@ -156,8 +231,50 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 		http.NotFound(w, r)
 		return
 	}
-	msg := fmt.Sprintf("Created review for ID %d..", movieID)
-	w.Write([]byte(msg))
+	movie, err := app.movies.Get(movieID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+
+	var form movieReviewForm
+	if err := app.decodePostForm(r, &form); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	form.ReviewText = strings.TrimSpace(form.ReviewText)
+	form.CheckField(validator.PermittedValue(form.Rating, 1, 2, 3, 4, 5), "rating", "Choose a rating between 1 and 5.")
+	form.CheckField(validator.NotBlank(form.ReviewText), "review_text", "Write your review before submitting.")
+	form.CheckField(validator.MaxChars(form.ReviewText, 2000), "review_text", "Your review must be 2000 characters or fewer.")
+	if !form.Valid() {
+		data := app.newTemplateData(r)
+		data.Movie = movie
+		data.Form = form
+		app.render(w, r, http.StatusUnprocessableEntity, "review.tmpl", data)
+		return
+	}
+
+	// The author comes from the session, never from submitted form data.
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	if userID < 1 {
+		http.Redirect(w, r, "/user/login", http.StatusSeeOther)
+		return
+	}
+	_, err = app.reviews.Insert(movieID, userID, form.Rating, form.ReviewText)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	app.sessionManager.Put(r.Context(), "flash", "Your review has been published.")
+	http.Redirect(w, r, fmt.Sprintf("/movies/%d#reviews", movieID), http.StatusSeeOther)
 }
 
 func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
@@ -219,8 +336,50 @@ func (app *application) personDetail(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 		return
 	}
-	msg := fmt.Sprintf("Display a specific person with ID %d...", personID)
-	w.Write([]byte(msg))
+	person, err := app.persons.Get(personID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	data := app.newTemplateData(r)
+	data.Person = person
+	app.render(w, r, http.StatusOK, "person.tmpl", data)
+}
+
+func (app *application) personSearch(w http.ResponseWriter, r *http.Request) {
+	query := strings.TrimSpace(r.URL.Query().Get("q"))
+	if !validator.MaxChars(query, 100) {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	type result struct {
+		ID           int    `json:"id"`
+		Name         string `json:"name"`
+		ProfileImage string `json:"profile_image"`
+	}
+	results := make([]result, 0)
+	if query != "" {
+		persons, err := app.persons.Search(query, 6)
+		if err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		for _, person := range persons {
+			results = append(results, result{person.ID, person.Name, person.ProfileImage})
+		}
+	}
+	payload, err := json.Marshal(results)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Write(payload)
 }
 
 func (app *application) movieReviews(w http.ResponseWriter, r *http.Request) {

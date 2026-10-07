@@ -1,37 +1,37 @@
 {{define "title"}}Create a New Movie{{end}}
 
 {{define "main"}}
+<h2>Add a movie.</h2>
 <form action="/movies/add" method="POST">
 <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
     <div>
-        <label>Title:</label>
+        <label for="movie-title">Title</label>
         <!-- Use the `with` action to render the value of .Form.FieldErrors.title
         if it is not empty. -->
         {{with .Form.FieldErrors.title}}
             <label class='error'>{{.}}</label>
         {{end}}
         <!-- repopulate the title data by setting the `value` attribute. -->
-        <input type='text' name='title' value='{{.Form.Title}}'>
-    </div>
-    </div>
-
-    <div>
-        <label>Description:</label>
-        <textarea name="description">{{.Form.Description}}</textarea>
+        <input type='text' id='movie-title' name='title' value='{{.Form.Title}}'>
     </div>
 
     <div>
-        <label>Release Date:</label>
-       
-        <input type="date" name="release_date" value='{{.Form.ReleaseDate}}'> 
+        <label for="movie-description">Description</label>
+        <textarea id="movie-description" name="description">{{.Form.Description}}</textarea>
+    </div>
+
+    <div>
+        <label for="movie-release">Release date</label>
+
+        <input type="date" id="movie-release" name="release_date" value='{{.Form.ReleaseDate}}'>
         {{with .Form.FieldErrors.release_date}}
             <label class='error'>{{.}}</label>
         {{end}}
     </div>
 
     <div>
-        <label>Poster Image:</label>
-        <input type="text" name="poster_image" value='{{.Form.PosterImage}}'>
+        <label for="movie-poster">Poster image URL or path</label>
+        <input type="text" id="movie-poster" name="poster_image" value='{{.Form.PosterImage}}'>
     </div>
 
     <div>

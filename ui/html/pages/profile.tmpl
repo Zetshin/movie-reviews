@@ -1,0 +1,11 @@
+{{define "title"}}Your profile{{end}}
+{{define "main"}}
+<section class="profile-card">
+<div class="profile-avatar" aria-hidden="true">♙</div>
+<p class="eyebrow">YOUR ACCOUNT</p>
+<h1>Your profile.</h1>
+<p class="muted">Your place in the MovieClub TH community.</p>
+{{with .User}}<dl><dt>Name</dt><dd>{{.Name}}</dd><dt>Email</dt><dd>{{.Email}}</dd><dt>Member since</dt><dd>{{humanDate .Created}}</dd></dl>{{end}}
+<a class="button gold" href="/movies/">Discover movies →</a>
+</section>
+{{end}}
