@@ -23,11 +23,11 @@ type MoviePersonModel struct {
 }
 
 func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
-	stmt := `SELECT persons.name, COALESCE(persons.profile_image, ''), movie_person.role
+	stmt := `SELECT persons.name, COALESCE(persons.profile_image, ''), movie_persons.role
 	FROM persons
-	JOIN movie_person 
-	ON persons.id = movie_person.person_id
-	WHERE movie_person.movie_id = ?`
+	JOIN movie_persons
+	ON persons.id = movie_persons.person_id
+	WHERE movie_persons.movie_id = ?`
 	rows, err := m.DB.Query(stmt, movieID)
 	if err != nil {
 		return nil, err
@@ -49,11 +49,11 @@ func (m *MoviePersonModel) GetCastMembers(movieID int) ([]CastMember, error) {
 }
 
 func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, error) {
-	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, COALESCE(movies.poster_image, ''), movies.review_count, movies.avg_rating,movie_person.role
-	From movies
-	JOIN movie_person
-	ON movies.id = movie_person.movie_id
-	WHERE movie_person.person_id = ?`
+	stmt := `SELECT movies.id, movies.title, movies.description, movies.release_date, COALESCE(movies.poster_image, ''), movies.review_count, movies.avg_rating,movie_persons.role
+	FROM movies
+	JOIN movie_persons
+	ON movies.id = movie_persons.movie_id
+	WHERE movie_persons.person_id = ?`
 	rows, err := m.DB.Query(stmt, personID)
 	if err != nil {
 		return nil, err
@@ -62,10 +62,12 @@ func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, erro
 	var movies []FilmographyItem
 	for rows.Next() { // ถ้ามีปัญหาเนื่องจาก pool connection หลุดมันจะออกจากลูปเราเลยต้องไปเช็คเผื่อว่ามันเป็นเพราะหลุดหรือว่า row หมดแล้วอีกทีผ่าน rows.Err()
 		var s FilmographyItem
-		err = rows.Scan(&s.ID, &s.Title, &s.Description, &s.ReleaseDate, &s.PosterImage, &s.ReviewCount, &s.AvgRating, &s.Role)
+		var releaseDate sql.NullTime
+		err = rows.Scan(&s.ID, &s.Title, &s.Description, &releaseDate, &s.PosterImage, &s.ReviewCount, &s.AvgRating, &s.Role)
 		if err != nil {
 			return nil, err
 		}
+		s.ReleaseDate = releaseDate.Time
 		movies = append(movies, s)
 
 	}
@@ -76,7 +78,7 @@ func (m *MoviePersonModel) GetFilmography(personID int) ([]FilmographyItem, erro
 }
 
 func (m *MoviePersonModel) Insert(movieID int, personID int, role string) error {
-	stmt := `INSERT INTO movie_person (movie_id, person_id, role)
+	stmt := `INSERT INTO movie_persons (movie_id, person_id, role)
 	VALUES (?,?,?)`
 	_, err := m.DB.Exec(stmt, movieID, personID, role)
 	if err != nil {

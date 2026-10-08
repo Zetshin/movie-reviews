@@ -8,6 +8,7 @@ import (
 
 type Person struct {
 	ID           int
+	TMDBID       int
 	Name         string
 	Bio          string
 	BirthDate    time.Time
@@ -40,6 +41,29 @@ func (m *PersonModel) Latest(limit int) ([]Person, error) {
 		return nil, err
 	}
 	return persons, nil
+}
+
+// LatestWithImages selects people for Home without changing the general Latest method.
+func (m *PersonModel) LatestWithImages(limit int) ([]Person, error) {
+	if limit < 1 || limit > 100 {
+		return nil, errors.New("person image limit must be between 1 and 100")
+	}
+	rows, err := m.DB.Query(`SELECT id, name, profile_image FROM persons
+		WHERE profile_image IS NOT NULL AND TRIM(profile_image) <> ''
+		ORDER BY id DESC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var persons []Person
+	for rows.Next() {
+		var person Person
+		if err := rows.Scan(&person.ID, &person.Name, &person.ProfileImage); err != nil {
+			return nil, err
+		}
+		persons = append(persons, person)
+	}
+	return persons, rows.Err()
 }
 
 func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profileImage string) (int, error) {
@@ -95,4 +119,96 @@ func (m *PersonModel) Search(query string, limit int) ([]Person, error) {
 		persons = append(persons, person)
 	}
 	return persons, rows.Err()
+}
+
+// TMDBIDs lists only imported people, leaving manually created people untouched.
+func (m *PersonModel) TMDBIDs() ([]int, error) {
+	rows, err := m.DB.Query(`SELECT tmdb_id FROM persons WHERE tmdb_id IS NOT NULL ORDER BY id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+// FillTMDBDetails fills missing fields without overwriting existing edits.
+func (m *PersonModel) FillTMDBDetails(tmdbID int, bio string, birthday *time.Time, profileImage string) error {
+	var birthDate any
+	if birthday != nil {
+		birthDate = *birthday
+	}
+	_, err := m.DB.Exec(`UPDATE persons SET
+		bio = IF(COALESCE(TRIM(bio), '') = '', ?, bio),
+		birth_date = COALESCE(birth_date, ?),
+		profile_image = IF(COALESCE(TRIM(profile_image), '') = '', ?, profile_image)
+		WHERE tmdb_id = ?`, bio, birthDate, profileImage, tmdbID)
+	return err
+}
+
+// SetTrending atomically replaces the selected ordering, preserving other people.
+func (m *PersonModel) SetTrending(people []Person) error {
+	if len(people) == 0 {
+		return errors.New("trending people cannot be empty")
+	}
+	for _, p := range people {
+		if p.TMDBID < 1 || p.Name == "" || p.ProfileImage == "" {
+			return errors.New("trending person must have an ID, name and image")
+		}
+	}
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`UPDATE persons SET trending_rank = NULL WHERE trending_rank IS NOT NULL`); err != nil {
+		return err
+	}
+	for i, p := range people {
+		var birthday any
+		if !p.BirthDate.IsZero() {
+			birthday = p.BirthDate
+		}
+		_, err := tx.Exec(`INSERT INTO persons (tmdb_id, name, bio, birth_date, profile_image, trending_rank)
+			VALUES (?, ?, ?, ?, ?, ?)
+			ON DUPLICATE KEY UPDATE trending_rank = ?,
+			bio = IF(COALESCE(TRIM(bio), '') = '', ?, bio),
+			birth_date = COALESCE(birth_date, ?),
+			profile_image = IF(COALESCE(TRIM(profile_image), '') = '', ?, profile_image)`,
+			p.TMDBID, p.Name, p.Bio, birthday, p.ProfileImage, i+1,
+			i+1, p.Bio, birthday, p.ProfileImage)
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+func (m *PersonModel) Trending(limit int) ([]Person, error) {
+	if limit < 1 || limit > 100 {
+		return nil, errors.New("trending people limit must be between 1 and 100")
+	}
+	rows, err := m.DB.Query(`SELECT id, name, profile_image FROM persons
+		WHERE trending_rank IS NOT NULL AND COALESCE(profile_image, '') <> ''
+		ORDER BY trending_rank ASC, id ASC LIMIT ?`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var people []Person
+	for rows.Next() {
+		var p Person
+		if err := rows.Scan(&p.ID, &p.Name, &p.ProfileImage); err != nil {
+			return nil, err
+		}
+		people = append(people, p)
+	}
+	return people, rows.Err()
 }

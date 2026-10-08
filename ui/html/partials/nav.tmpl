@@ -1,14 +1,13 @@
 {{define "nav"}}
 <header class="site-header">
 <a class="brand" href="/" aria-label="MovieClub TH home">Movie<span>Club</span> TH<span class="brand-dot">.</span></a>
-<nav class="navigation" aria-label="Main navigation"><a href="/">Home</a><a href="/movies/">Movies</a><a href="/#actors">People</a></nav>
+<nav class="navigation" aria-label="Main navigation"><a href="/">Home</a><a href="/movies/">Movies</a><a href="/#actors">People</a><a href="#about">About</a>{{if .IsAdmin}}<a href="/movies/add">Admin</a>{{end}}</nav>
 <div class="account">
 {{if .IsAuthenticated}}
 <a href="/profile">Profile</a>
-{{if .IsAdmin}}<a class="button gold compact" href="/movies/add">Add movie</a>{{end}}
-<form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle compact" type="submit">Sign out</button></form>
+<form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle compact" type="submit">Logout</button></form>
 {{else}}
-<a href="/user/login">Sign in</a><a class="button gold compact" href="/user/signup">Join the club</a>
+<a href="/user/login">Login</a><a class="button gold compact" href="/user/signup">Sign up</a>
 {{end}}
 </div>
 </header>

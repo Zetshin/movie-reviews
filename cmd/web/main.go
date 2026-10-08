@@ -11,10 +11,12 @@ import (
 	"time" // New import
 
 	"github.com/Zetshin/movie-reviews/internal/models"
+	"github.com/Zetshin/movie-reviews/internal/tmdb"
 	"github.com/alexedwards/scs/mysqlstore" // New import
 	"github.com/alexedwards/scs/v2"         // New import
 	"github.com/go-playground/form/v4"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/joho/godotenv"
 )
 
 type application struct {
@@ -26,14 +28,39 @@ type application struct {
 	sessionManager *scs.SessionManager
 	reviews        *models.ReviewModel
 	persons        *models.PersonModel
+	moviePersons   *models.MoviePersonModel
+	tmdb           *tmdb.Client
 }
 
 func main() {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+	err := godotenv.Load()
+	if err != nil {
+		logger.Error("could not load .env", "error", err)
+		os.Exit(1)
+	}
+
+	apiKey := os.Getenv("TMDB_API_KEY")
+	if apiKey == "" {
+		logger.Error("TMDB_API_KEY is missing")
+		os.Exit(1)
+	}
 	addr := flag.String("addr", ":4000", "HTTP network address")
+	importTMDB := flag.Int("import-tmdb", 0, "Import 1-20 now-playing movies from TMDB, then exit without starting the server")
+	importPeople := flag.Bool("import-person-details", false, "Fill details for imported TMDB people, then exit without starting the server")
+	importTrending := flag.Int("import-trending-people", 0, "Import 1-20 weekly trending people for Home, then exit")
 	dsn := flag.String("dsn", "user:pass@/movies?parseTime=true", "MySQL data source name")
 	flag.Parse() //รับค่าเริ่มต้นจาก user ตอนรันโปรแกรม
+	if *importTMDB < 0 || *importTMDB > 20 {
+		logger.Error("import-tmdb must be between 1 and 20, or 0 to start the server normally")
+		os.Exit(1)
+	}
+	if *importTrending < 0 || *importTrending > 20 {
+		logger.Error("import-trending-people must be between 1 and 20, or 0 to skip")
+		os.Exit(1)
+	}
 
-	logger := slog.New(slog.NewTextHandler(os.Stdout, nil)) //ให้ log เป็นแบบโครงสร้าง พวกนี้สามารถ filter หาได้ง่ายเพราะเป็น key-value
+	//ให้ log เป็นแบบโครงสร้าง พวกนี้สามารถ filter หาได้ง่ายเพราะเป็น key-value
 	db, err := openDB(*dsn)
 	if err != nil {
 		logger.Error(err.Error())
@@ -65,6 +92,33 @@ func main() {
 		sessionManager: sessionManager,
 		reviews:        &models.ReviewModel{DB: db},
 		persons:        &models.PersonModel{DB: db},
+		moviePersons:   &models.MoviePersonModel{DB: db},
+		tmdb:           tmdb.NewClient(apiKey),
+	}
+	if *importTMDB > 0 {
+		if err := app.importNowPlayingMovies(*importTMDB); err != nil {
+			logger.Error("TMDB starter import failed", "error", err)
+			os.Exit(1)
+		}
+		if !*importPeople && *importTrending == 0 {
+			return
+		}
+	}
+	if *importPeople {
+		if err := app.importPersonDetails(); err != nil {
+			logger.Error("TMDB person import failed", "error", err)
+			os.Exit(1)
+		}
+		if *importTrending == 0 {
+			return
+		}
+	}
+	if *importTrending > 0 {
+		if err := app.importTrendingPeople(*importTrending); err != nil {
+			logger.Error("TMDB trending people import failed", "error", err)
+			os.Exit(1)
+		}
+		return
 	}
 
 	tlsConfig := &tls.Config{

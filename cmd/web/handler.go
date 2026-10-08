@@ -90,8 +90,8 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		topPicks = append(topPicks, pick)
 	}
 
-	// บุคคลล่าสุด: ยังไม่ได้กรองบทบาทนักแสดง
-	actors, err := app.persons.Latest(6)
+	// Home ใช้ลำดับ Trending People ที่นำเข้าจาก TMDB; ข้อมูลคนเดิมยังอยู่
+	actors, err := app.persons.Trending(6)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -220,8 +220,8 @@ func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
 }
 
 type movieReviewForm struct {
-	Rating              int    `form:"rating"`
-	ReviewText          string `form:"review_text"`
+	Rating              float64 `form:"rating"`
+	ReviewText          string  `form:"review_text"`
 	validator.Validator `form:"-"`
 }
 
@@ -247,7 +247,7 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	form.ReviewText = strings.TrimSpace(form.ReviewText)
-	form.CheckField(validator.PermittedValue(form.Rating, 1, 2, 3, 4, 5), "rating", "Choose a rating between 1 and 5.")
+	form.CheckField(validator.PermittedValue(form.Rating, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0), "rating", "Choose a rating from 0.5 to 5 in half-star increments.")
 	form.CheckField(validator.NotBlank(form.ReviewText), "review_text", "Write your review before submitting.")
 	form.CheckField(validator.MaxChars(form.ReviewText, 2000), "review_text", "Your review must be 2000 characters or fewer.")
 	if !form.Valid() {
@@ -281,6 +281,23 @@ func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
 
 	data.Form = movieAddForm{}
+	data.TMDBSearch = strings.TrimSpace(r.URL.Query().Get("q"))
+	if !validator.MaxChars(data.TMDBSearch, 100) {
+		data.TMDBError = "Search must be 100 characters or fewer."
+		app.render(w, r, http.StatusUnprocessableEntity, "add.tmpl", data)
+		return
+	}
+	if data.TMDBSearch != "" {
+		data.TMDBSearchDone = true
+		list, err := app.tmdb.SearchMovies(data.TMDBSearch)
+		if err != nil {
+			app.logger.Error("TMDB search failed", "error", err)
+			data.TMDBError = "Could not search TMDB. Please try again."
+			app.render(w, r, http.StatusBadGateway, "add.tmpl", data)
+			return
+		}
+		data.TMDBMovies = list.Results
+	}
 	app.render(w, r, http.StatusOK, "add.tmpl", data)
 }
 
@@ -293,6 +310,14 @@ type movieAddForm struct {
 }
 
 func (app *application) movieAddPost(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	if r.PostForm.Get("action") == "import_tmdb" {
+		app.movieImportTMDBPost(w, r)
+		return
+	}
 
 	// Declare a new empty instance of the snippetCreateForm struct.
 	var form movieAddForm
@@ -347,6 +372,11 @@ func (app *application) personDetail(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	data.Person = person
+	data.PersonMovies, err = app.moviePersons.GetFilmography(personID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 	app.render(w, r, http.StatusOK, "person.tmpl", data)
 }
 

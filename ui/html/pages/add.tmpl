@@ -1,7 +1,31 @@
-{{define "title"}}Create a New Movie{{end}}
+{{define "title"}}Manage Movies{{end}}
 
 {{define "main"}}
-<h2>Add a movie.</h2>
+<div class="page-heading"><div><p class="eyebrow">ADMIN / MOVIE LIBRARY</p><h1>Add a movie.</h1><p>Import a movie and its cast from TMDB, or add one manually.</p></div></div>
+<section class="tmdb-admin" aria-labelledby="tmdb-heading">
+<h2 id="tmdb-heading">Find a movie on TMDB</h2>
+<p class="tmdb-help">Search by title. Thai translations are shown when available. Results show the first page; refine the title if your movie is missing.</p>
+<form action="/movies/add" method="GET" class="tmdb-search-form">
+<label for="tmdb-query">Movie title</label>
+<div class="tmdb-search-controls"><input type="search" id="tmdb-query" name="q" value="{{.TMDBSearch}}" maxlength="100" placeholder="Search Thai or English titles" required><button class="button gold" type="submit">Search TMDB</button></div>
+</form>
+{{with .TMDBError}}<p class="error" role="alert">{{.}}</p>{{end}}
+{{if .TMDBSearchDone}}
+{{if .TMDBMovies}}
+<p class="tmdb-help">Searching does not save anything. Choose Import to save a movie and its cast. Existing TMDB records are reused.</p>
+<div class="tmdb-results">
+{{range .TMDBMovies}}
+<article class="tmdb-result">
+{{if .PosterPath}}<img class="tmdb-poster" src="{{tmdbImageURL .PosterPath}}" alt="Poster for {{.Title}}" loading="lazy">{{else}}<div class="tmdb-poster tmdb-no-poster" aria-label="Poster unavailable">No poster</div>{{end}}
+<div class="tmdb-result-copy"><h3>{{.Title}}</h3><p class="tmdb-help">{{if .ReleaseDate}}{{.ReleaseDate}}{{else}}Release date unavailable{{end}} · TMDB #{{.ID}}</p><p class="tmdb-overview">{{if .Overview}}{{.Overview}}{{else}}No synopsis available.{{end}}</p>
+<form action="/movies/add" method="POST"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><input type="hidden" name="action" value="import_tmdb"><input type="hidden" name="tmdb_id" value="{{.ID}}"><button class="button gold compact" type="submit">Import movie + cast</button></form>
+</div></article>
+{{end}}
+</div>
+{{else if not .TMDBError}}<p class="empty-state">No matches found. Try a different title.</p>{{end}}
+{{else}}<p class="tmdb-help">Start with a title to find movies to import.</p>{{end}}
+</section>
+<h2>Add manually</h2>
 <form action="/movies/add" method="POST">
 <input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
     <div>

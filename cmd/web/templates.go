@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Zetshin/movie-reviews/internal/models"
+	"github.com/Zetshin/movie-reviews/internal/tmdb"
 )
 
 type paginationData struct {
@@ -27,6 +28,7 @@ type HomeTopPick struct {
 
 type templateData struct {
 	Person          models.Person
+	PersonMovies    []models.FilmographyItem
 	User            models.User
 	CurrentYear     int
 	Movie           models.Movie
@@ -40,6 +42,10 @@ type templateData struct {
 	CSRFToken       string
 	TopPicks        []HomeTopPick
 	Actors          []models.Person
+	TMDBSearch      string
+	TMDBMovies      []tmdb.Movie
+	TMDBSearchDone  bool
+	TMDBError       string
 }
 
 // Create a humanDate function which returns a nicely formatted string
@@ -52,7 +58,8 @@ func humanDate(t time.Time) string {
 // essentially a string-keyed map which acts as a lookup table mapping names to
 // functions.
 var functions = template.FuncMap{
-	"humanDate": humanDate,
+	"humanDate":    humanDate,
+	"tmdbImageURL": tmdb.ImageURL,
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

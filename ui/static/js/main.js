@@ -6,3 +6,11 @@ for (var i = 0; i < navLinks.length; i++) {
 		break;
 	}
 }
+(() => {
+  const picker = document.querySelector('.star-picker');
+  if (!picker) return;
+  const output = document.querySelector('.selected-rating');
+  picker.addEventListener('change', event => {
+    if (event.target.name === 'rating') output.textContent = `${event.target.value} / 5 stars`;
+  });
+})();

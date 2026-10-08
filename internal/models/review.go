@@ -12,7 +12,7 @@ type Review struct {
 	MovieID   int
 	UserID    int
 	Username  string
-	Rating    int
+	Rating    float64
 	Review    string
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -107,7 +107,7 @@ func (m *ReviewModel) GetRandom(movieID int) (Review, error) {
 }
 
 // Insert saves the review and refreshes its movie's statistics atomically.
-func (m *ReviewModel) Insert(movieID, userID int, rating int, reviewText string) (int, error) {
+func (m *ReviewModel) Insert(movieID, userID int, rating float64, reviewText string) (int, error) {
 	tx, err := m.DB.Begin()
 	if err != nil {
 		return 0, err
@@ -155,7 +155,7 @@ func (m *ReviewModel) Delete(reviewID int) error {
 	return tx.Commit()
 }
 
-func (m *ReviewModel) Update(rating int, reviewText string, reviewID int) error {
+func (m *ReviewModel) Update(rating float64, reviewText string, reviewID int) error {
 	tx, movieID, err := m.beginReviewChange(reviewID)
 	if err != nil {
 		return err

@@ -18,7 +18,8 @@
 {{with .Flash}}<div class="flash" role="status">{{.}}</div>{{end}}
 {{template "main" .}}
 </main>
-<footer class="site-footer"><a class="brand" href="/">Movie<span>Club</span> TH.</a><p>A good film stays with you.</p><span>© {{.CurrentYear}} MovieClub TH</span></footer>
+<footer class="site-footer"><a class="brand" href="/">Movie<span>Club</span> TH.</a><p>A good film stays with you.</p><a class="text-link" href="#credits">Credits</a><span>© {{.CurrentYear}} MovieClub TH</span></footer>
+{{template "credits" .}}
 </body>
 </html>
 {{end}}

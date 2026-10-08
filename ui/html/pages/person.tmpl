@@ -7,4 +7,11 @@
 <div><p class="eyebrow">PEOPLE IN FILM</p><h1>{{.Name}}</h1>{{if not .BirthDate.IsZero}}<p class="muted">Born {{.BirthDate.Format "02 January 2006"}}</p>{{end}}<h2>Biography</h2><p class="description">{{if .Bio}}{{.Bio}}{{else}}No biography available yet.{{end}}</p></div>
 </section>
 {{end}}
+<section class="person-filmography" aria-labelledby="filmography-title">
+<div class="section-heading"><h2 id="filmography-title">Movies in our library</h2></div>
+<p class="muted">Credits for movies imported into MovieClub TH.</p>
+<div class="catalog-grid">
+{{range .PersonMovies}}<a class="movie-card" href="/movies/{{.ID}}"><div class="poster">{{if .PosterImage}}<img src="{{.PosterImage}}" alt="Poster for {{.Title}}" loading="lazy">{{end}}<span class="poster-fallback" aria-hidden="true">MOVIE<br><b>CLUB TH</b></span></div><div class="card-copy"><h3>{{.Title}}</h3><div class="card-meta"><span>{{if not .ReleaseDate.IsZero}}{{.ReleaseDate.Format "2006"}}{{else}}Year unavailable{{end}}</span><span class="rating">★ {{.AvgRating}} / 5</span></div></div></a>{{else}}<p class="empty-state">No movie credits in our library yet.</p>{{end}}
+</div>
+</section>
 {{end}}
