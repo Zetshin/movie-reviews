@@ -70,10 +70,11 @@ func (m *MovieModel) Get(id int) (Movie, error) {
 
 }
 
-// Latest returns up to limit movies ordered by descending ID.
+// Latest returns movies by newest release date, with undated movies last.
+// Local ID breaks ties when release dates match.
 func (m *MovieModel) Latest(limit int) ([]Movie, error) {
 	stmt := `SELECT id, title, description, release_date, COALESCE(poster_image, ''), review_count, avg_rating, COALESCE(backdrop_image, '') FROM movies
-	ORDER BY id DESC LIMIT ?`
+	ORDER BY release_date DESC, id DESC LIMIT ?`
 	rows, err := m.DB.Query(stmt, limit)
 
 	if err != nil {
@@ -138,7 +139,7 @@ func updateReviewStats(tx *sql.Tx, movieID int) error {
 
 func (m *MovieModel) TopPicks() ([]Movie, error) {
 	stmt := `SELECT id, title, COALESCE(poster_image, ''), review_count, avg_rating FROM movies
-	WHERE avg_rating > 4.00 AND review_count >= 5
+	WHERE avg_rating > 4.00
 	ORDER BY avg_rating DESC, review_count DESC, id DESC LIMIT 3
 	`
 	rows, err := m.DB.Query(stmt)

@@ -91,8 +91,7 @@ func (app *application) importNowPlayingMovies(limit int) error {
 	if len(list.Results) > limit {
 		list.Results = list.Results[:limit]
 	}
-	// Insert older selections first so Latest(), ordered by local ID, puts
-	// the newest selection first when initializing an empty catalog.
+	// Import older selections first. Latest() independently sorts by release date.
 	for i := len(list.Results) - 1; i >= 0; i-- {
 		movie := list.Results[i]
 		movieID, err := app.importTMDBMovie(movie.ID)

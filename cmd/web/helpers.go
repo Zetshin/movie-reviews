@@ -4,9 +4,12 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"image"
 	"net/http"
+	"strconv"
 	"time"
 
+	"github.com/Zetshin/movie-reviews/internal/models"
 	"github.com/go-playground/form/v4"
 	"github.com/justinas/nosurf"
 )
@@ -55,13 +58,23 @@ func (app *application) clientError(w http.ResponseWriter, status int) {
 // initialized with the current year. Note that we're not using the *http.Request
 // parameter here at the moment, but we will use it later in the book.
 func (app *application) newTemplateData(r *http.Request) templateData {
-	return templateData{
+	data := templateData{
 		CurrentYear:     time.Now().Year(),
 		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
 		IsAuthenticated: app.isAuthenticated(r),
 		IsAdmin:         app.isAdmin(r),
 		CSRFToken:       nosurf.Token(r),
 	}
+	if data.IsAuthenticated {
+		userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+		user, err := app.users.Get(userID)
+		if err != nil {
+			app.logger.Error("could not load navigation avatar", "error", err)
+		} else {
+			data.User = user
+		}
+	}
+	return data
 }
 
 // is the target destination into which we want to decode the form data.
@@ -111,4 +124,56 @@ func (app *application) isAdmin(r *http.Request) bool {
 	}
 
 	return isAdmin
+}
+
+const avatarDirectory = "ui/static/uploads/avatars"
+
+func squareAvatar(source image.Image) *image.RGBA {
+	bounds := source.Bounds()
+	side := min(bounds.Dx(), bounds.Dy())
+	x0, y0 := bounds.Min.X+(bounds.Dx()-side)/2, bounds.Min.Y+(bounds.Dy()-side)/2
+	result := image.NewRGBA(image.Rect(0, 0, 256, 256))
+	for y := 0; y < 256; y++ {
+		for x := 0; x < 256; x++ {
+			result.Set(x, y, source.At(x0+x*side/256, y0+y*side/256))
+		}
+	}
+	return result
+}
+
+func (app *application) renderAvatarError(w http.ResponseWriter, r *http.Request, message string) {
+	data := app.newTemplateData(r)
+	var err error
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	data.User, err = app.users.Get(userID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	data.UserReviews, err = app.reviews.ListByUserID(userID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	data.AvatarError = message
+	app.render(w, r, http.StatusUnprocessableEntity, "profile.tmpl", data)
+}
+
+func (app *application) ownedReview(w http.ResponseWriter, r *http.Request) (models.Review, bool) {
+	id, err := strconv.Atoi(r.PathValue("reviewID"))
+	if err != nil || id < 1 {
+		http.NotFound(w, r)
+		return models.Review{}, false
+	}
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	review, err := app.reviews.GetForUser(id, userID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return models.Review{}, false
+	}
+	return review, true
 }

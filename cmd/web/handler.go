@@ -1,10 +1,18 @@
 package main
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image"
+	_ "image/jpeg"
+	"image/png"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv" // New import
 	"strings"
 	"time"
@@ -54,21 +62,21 @@ func (app *application) movieSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
-	// หนังล่าสุด: ใช้ทั้ง Hero และ New Movies
+	// à¸«à¸™à¸±à¸‡à¸§à¸±à¸™à¸‰à¸²à¸¢à¸¥à¹ˆà¸²à¸ªà¸¸à¸”: à¹ƒà¸Šà¹‰à¸—à¸±à¹‰à¸‡ Hero à¹à¸¥à¸° New Movies
 	movies, err := app.movies.Latest(6)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// หนังที่ผ่านเกณฑ์ Top Picks
+	// à¸«à¸™à¸±à¸‡à¸—à¸µà¹ˆà¸œà¹ˆà¸²à¸™à¹€à¸à¸“à¸‘à¹Œ Top Picks
 	topMovies, err := app.movies.TopPicks()
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// จับคู่หนังแต่ละเรื่องกับรีวิวของเรื่องนั้น
+	// à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸«à¸™à¸±à¸‡à¹à¸•à¹ˆà¸¥à¸°à¹€à¸£à¸·à¹ˆà¸­à¸‡à¸à¸±à¸šà¸£à¸µà¸§à¸´à¸§à¸‚à¸­à¸‡à¹€à¸£à¸·à¹ˆà¸­à¸‡à¸™à¸±à¹‰à¸™
 	var topPicks []HomeTopPick
 
 	for _, movie := range topMovies {
@@ -82,7 +90,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 				app.serverError(w, r, err)
 				return
 			}
-			// ไม่มีรีวิวผ่านเงื่อนไข: ReviewPreview เป็น nil
+			// à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸µà¸§à¸´à¸§à¸œà¹ˆà¸²à¸™à¹€à¸‡à¸·à¹ˆà¸­à¸™à¹„à¸‚: ReviewPreview à¹€à¸›à¹‡à¸™ nil
 		} else {
 			pick.ReviewPreview = &review
 		}
@@ -90,14 +98,14 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		topPicks = append(topPicks, pick)
 	}
 
-	// Home ใช้ลำดับ Trending People ที่นำเข้าจาก TMDB; ข้อมูลคนเดิมยังอยู่
+	// Home à¹ƒà¸Šà¹‰à¸¥à¸³à¸”à¸±à¸š Trending People à¸—à¸µà¹ˆà¸™à¸³à¹€à¸‚à¹‰à¸²à¸ˆà¸²à¸ TMDB; à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸™à¹€à¸”à¸´à¸¡à¸¢à¸±à¸‡à¸­à¸¢à¸¹à¹ˆ
 	actors, err := app.persons.Trending(6)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// ส่งข้อมูลทั้งหมดให้ Home
+	// à¸ªà¹ˆà¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸«à¹‰ Home
 	data := app.newTemplateData(r)
 	data.Movies = movies
 	data.TopPicks = topPicks
@@ -123,6 +131,11 @@ func (app *application) profile(w http.ResponseWriter, r *http.Request) {
 	}
 	data := app.newTemplateData(r)
 	data.User = user
+	data.UserReviews, err = app.reviews.ListByUserID(userID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
 	app.render(w, r, http.StatusOK, "profile.tmpl", data)
 }
 func (app *application) moviesShow(w http.ResponseWriter, r *http.Request) {
@@ -595,4 +608,130 @@ func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
 	app.sessionManager.Put(r.Context(), "flash", "You've been logged out successfully!")
 	// Redirect the user to the application home page.
 	http.Redirect(w, r, "/movies/", http.StatusSeeOther)
+}
+
+func (app *application) profileAvatarPost(w http.ResponseWriter, r *http.Request) {
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
+	if err := r.ParseMultipartForm(3 << 20); err != nil {
+		app.renderAvatarError(w, r, "Upload a JPG or PNG image no larger than 2 MB.")
+		return
+	}
+	defer r.MultipartForm.RemoveAll()
+	file, header, err := r.FormFile("avatar")
+	if err != nil || header.Size > 2<<20 {
+		if file != nil {
+			file.Close()
+		}
+		app.renderAvatarError(w, r, "Choose a JPG or PNG image no larger than 2 MB.")
+		return
+	}
+	defer file.Close()
+	config, format, err := image.DecodeConfig(file)
+	if err != nil || (format != "jpeg" && format != "png") || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height) > 16000000 {
+		app.renderAvatarError(w, r, "Use a valid JPG or PNG image with no more than 16 million pixels.")
+		return
+	}
+	if _, err := file.Seek(0, 0); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	source, _, err := image.Decode(file)
+	if err != nil {
+		app.renderAvatarError(w, r, "Could not read this image. Try another JPG or PNG.")
+		return
+	}
+	// Crop centrally and store a small PNG, not the original untrusted upload.
+	avatar := squareAvatar(source)
+	var random [16]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	name := hex.EncodeToString(random[:]) + ".png"
+	if err := os.MkdirAll(avatarDirectory, 0755); err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	path := filepath.Join(avatarDirectory, name)
+	output, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0644)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	encodeErr := png.Encode(output, avatar)
+	closeErr := output.Close()
+	if encodeErr != nil || closeErr != nil {
+		os.Remove(path)
+		app.serverError(w, r, errors.Join(encodeErr, closeErr))
+		return
+	}
+	old, err := app.users.SetAvatar(userID, "/static/uploads/avatars/"+name)
+	if err != nil {
+		os.Remove(path)
+		app.serverError(w, r, err)
+		return
+	}
+	// Only remove a generated file in this avatar directory, never an arbitrary path.
+	if match := regexp.MustCompile(`^/static/uploads/avatars/([a-f0-9]{32}\.png)$`).FindStringSubmatch(old); len(match) == 2 {
+		if err := os.Remove(filepath.Join(avatarDirectory, match[1])); err != nil && !errors.Is(err, os.ErrNotExist) {
+			app.logger.Error("could not remove old avatar", "error", err)
+		}
+	}
+	app.sessionManager.Put(r.Context(), "flash", "Your profile photo has been updated.")
+	http.Redirect(w, r, "/profile", http.StatusSeeOther)
+}
+
+func (app *application) reviewEdit(w http.ResponseWriter, r *http.Request) {
+	review, ok := app.ownedReview(w, r)
+	if !ok {
+		return
+	}
+	movie, err := app.movies.Get(review.MovieID)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	data := app.newTemplateData(r)
+	data.Movie, data.EditingReviewID = movie, review.ID
+	data.Form = movieReviewForm{Rating: review.Rating, ReviewText: review.Review}
+	app.render(w, r, http.StatusOK, "review.tmpl", data)
+}
+
+func (app *application) reviewEditPost(w http.ResponseWriter, r *http.Request) {
+	review, ok := app.ownedReview(w, r)
+	if !ok {
+		return
+	}
+	var form movieReviewForm
+	if err := app.decodePostForm(r, &form); err != nil {
+		app.clientError(w, http.StatusBadRequest)
+		return
+	}
+	form.ReviewText = strings.TrimSpace(form.ReviewText)
+	form.CheckField(validator.PermittedValue(form.Rating, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0), "rating", "Choose a rating from 0.5 to 5 in half-star increments.")
+	form.CheckField(validator.NotBlank(form.ReviewText), "review_text", "Write your review before submitting.")
+	form.CheckField(validator.MaxChars(form.ReviewText, 2000), "review_text", "Your review must be 2000 characters or fewer.")
+	if !form.Valid() {
+		movie, err := app.movies.Get(review.MovieID)
+		if err != nil {
+			app.serverError(w, r, err)
+			return
+		}
+		data := app.newTemplateData(r)
+		data.Movie, data.EditingReviewID, data.Form = movie, review.ID, form
+		app.render(w, r, http.StatusUnprocessableEntity, "review.tmpl", data)
+		return
+	}
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	if err := app.reviews.UpdateForUser(form.Rating, form.ReviewText, review.ID, userID); err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	app.sessionManager.Put(r.Context(), "flash", "Your review has been updated.")
+	http.Redirect(w, r, fmt.Sprintf("/profile#review-%d", review.ID), http.StatusSeeOther)
 }

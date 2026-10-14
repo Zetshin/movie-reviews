@@ -4,7 +4,7 @@
 <nav class="navigation" aria-label="Main navigation"><a href="/">Home</a><a href="/movies/">Movies</a><a href="/#actors">People</a><a href="#about">About</a>{{if .IsAdmin}}<a href="/movies/add">Admin</a>{{end}}</nav>
 <div class="account">
 {{if .IsAuthenticated}}
-<a href="/profile">Profile</a>
+<a class="account-avatar" href="/profile" aria-label="Your profile">{{if .User.AvatarImage}}<img src="{{.User.AvatarImage}}" alt="">{{else}}<span aria-hidden="true">♙</span>{{end}}</a>
 <form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle compact" type="submit">Logout</button></form>
 {{else}}
 <a href="/user/login">Login</a><a class="button gold compact" href="/user/signup">Sign up</a>

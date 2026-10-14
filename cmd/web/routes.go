@@ -33,6 +33,9 @@ func (app *application) routes() http.Handler {
 	protected := dynamic.Append(app.requireAuthenticated)
 	mux.Handle("POST /user/logout", protected.ThenFunc(app.userLogoutPost))
 	mux.Handle("GET /profile", protected.ThenFunc(app.profile))
+	mux.Handle("POST /profile/avatar", alice.New(limitAvatarUpload).Extend(protected).ThenFunc(app.profileAvatarPost))
+	mux.Handle("GET /reviews/{reviewID}/edit", protected.ThenFunc(app.reviewEdit))
+	mux.Handle("POST /reviews/{reviewID}/edit", protected.ThenFunc(app.reviewEditPost))
 	mux.Handle("GET /movies/{movieID}/review", protected.ThenFunc(app.movieReview))
 	mux.Handle("POST /movies/{movieID}/review", protected.ThenFunc(app.movieReviewPost)) //ส่งรีวิว
 

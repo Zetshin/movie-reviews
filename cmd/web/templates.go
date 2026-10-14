@@ -30,6 +30,9 @@ type templateData struct {
 	Person          models.Person
 	PersonMovies    []models.FilmographyItem
 	User            models.User
+	UserReviews     []models.UserReview
+	EditingReviewID int
+	AvatarError     string
 	CurrentYear     int
 	Movie           models.Movie
 	Movies          []models.Movie

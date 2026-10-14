@@ -1,4 +1,7 @@
 var navLinks = document.querySelectorAll("nav a");
+document.querySelectorAll('.review-sort select').forEach(select => {
+  select.addEventListener('change', () => select.form.requestSubmit());
+});
 for (var i = 0; i < navLinks.length; i++) {
 	var link = navLinks[i]
 	if (link.getAttribute('href') == window.location.pathname) {

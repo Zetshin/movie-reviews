@@ -1,8 +1,8 @@
-{{define "title"}}Review {{.Movie.Title}}{{end}}
+{{define "title"}}{{if .EditingReviewID}}Edit review: {{else}}Review {{end}}{{.Movie.Title}}{{end}}
 {{define "main"}}
 <p class="breadcrumb"><a href="/movies/{{.Movie.ID}}#reviews">← Back to movie</a></p>
-<section class="review-intro"><p class="eyebrow">YOUR TAKE, YOUR RATING</p><h1>What stayed with you?</h1><p class="muted">Share your thoughts on <strong>{{.Movie.Title}}</strong>.</p></section>
-<form class="review-editor" action="/movies/{{.Movie.ID}}/review" method="POST">
+<section class="review-intro"><p class="eyebrow">YOUR TAKE, YOUR RATING</p><h1>{{if .EditingReviewID}}Update your review.{{else}}What stayed with you?{{end}}</h1><p class="muted">Share your thoughts on <strong>{{.Movie.Title}}</strong>.</p></section>
+<form class="review-editor" action="{{if .EditingReviewID}}/reviews/{{.EditingReviewID}}/edit{{else}}/movies/{{.Movie.ID}}/review{{end}}" method="POST">
 <input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
 <fieldset class="rating-field" {{with .Form.FieldErrors.rating}}aria-describedby="rating-error"{{end}}>
 <legend>Your rating</legend><p class="rating-hint">Choose from 0.5 to 5 stars. Select the left or right half of a star.</p>
@@ -25,6 +25,6 @@
 {{with .Form.FieldErrors.review_text}}<p class="error" id="review-error">{{.}}</p>{{end}}
 <textarea id="review-text" name="review_text" maxlength="2000" required placeholder="The scene I keep thinking about…" aria-describedby="review-hint{{with .Form.FieldErrors.review_text}} review-error{{end}}" {{with .Form.FieldErrors.review_text}}aria-invalid="true"{{end}}>{{.Form.ReviewText}}</textarea>
 <p>Up to 2000 characters.</p></div>
-<div class="editor-actions"><a class="button subtle" href="/movies/{{.Movie.ID}}#reviews">Cancel</a><button class="button gold" type="submit">Publish review ↗</button></div>
+<div class="editor-actions"><a class="button subtle" href="{{if .EditingReviewID}}/profile{{else}}/movies/{{.Movie.ID}}#reviews{{end}}">Cancel</a><button class="button gold" type="submit">{{if .EditingReviewID}}Save changes{{else}}Publish review ↗{{end}}</button></div>
 </form>
 {{end}}

@@ -22,6 +22,82 @@ type ReviewModel struct {
 	DB *sql.DB
 }
 
+type UserReview struct {
+	ID          int
+	MovieID     int
+	UserID      int
+	Rating      float64
+	ReviewText  string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	MovieTitle  string
+	PosterImage string
+}
+
+func (m *ReviewModel) ListByUserID(userID int) ([]UserReview, error) {
+	rows, err := m.DB.Query(`SELECT r.id, r.movie_id, r.user_id, r.rating, r.review_text,
+		r.created_at, r.updated_at, m.title, COALESCE(m.poster_image, '')
+		FROM reviews r JOIN movies m ON m.id = r.movie_id
+		WHERE r.user_id = ? ORDER BY r.created_at DESC, r.id DESC`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var reviews []UserReview
+	for rows.Next() {
+		var review UserReview
+		var updated sql.NullTime
+		if err := rows.Scan(&review.ID, &review.MovieID, &review.UserID, &review.Rating, &review.ReviewText,
+			&review.CreatedAt, &updated, &review.MovieTitle, &review.PosterImage); err != nil {
+			return nil, err
+		}
+		review.UpdatedAt = updated.Time
+		reviews = append(reviews, review)
+	}
+	return reviews, rows.Err()
+}
+
+func (m *ReviewModel) GetForUser(reviewID, userID int) (Review, error) {
+	var review Review
+	var updated sql.NullTime
+	err := m.DB.QueryRow(`SELECT id, movie_id, user_id, rating, review_text, created_at, updated_at
+		FROM reviews WHERE id = ? AND user_id = ?`, reviewID, userID).Scan(
+		&review.ID, &review.MovieID, &review.UserID, &review.Rating, &review.Review, &review.CreatedAt, &updated)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Review{}, ErrNoRecord
+	}
+	if err != nil {
+		return Review{}, err
+	}
+	review.UpdatedAt = updated.Time
+	return review, nil
+}
+
+// UpdateForUser checks ownership while holding the review lock, and refreshes
+// movie statistics in the same transaction as the review change.
+func (m *ReviewModel) UpdateForUser(rating float64, text string, reviewID, userID int) error {
+	tx, movieID, err := m.beginReviewChange(reviewID)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var owner int
+	if err := tx.QueryRow(`SELECT user_id FROM reviews WHERE id = ?`, reviewID).Scan(&owner); err != nil {
+		return err
+	}
+	if owner != userID {
+		return ErrNoRecord
+	}
+	if _, err := tx.Exec(`UPDATE reviews SET rating = ?, review_text = ?, updated_at = UTC_TIMESTAMP()
+		WHERE id = ? AND user_id = ?`, rating, text, reviewID, userID); err != nil {
+		return err
+	}
+	if err := updateReviewStats(tx, movieID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (m *ReviewModel) ListByMovieID(
 	movieID int,
 	sort string,

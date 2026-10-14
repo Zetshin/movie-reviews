@@ -103,3 +103,11 @@ func preventCSRF(next http.Handler) http.Handler {
 	})
 	return csrfHandler
 }
+
+// Limit the body before CSRF middleware parses a multipart form.
+func limitAvatarUpload(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
+		next.ServeHTTP(w, r)
+	})
+}

@@ -19,6 +19,7 @@ type User struct {
 	HashedPassword []byte
 	Created        time.Time
 	IsAdmin        bool
+	AvatarImage    string
 }
 
 // Define a new UserModel struct which wraps a database connection pool.
@@ -28,9 +29,9 @@ type UserModel struct {
 
 // Get returns profile information without loading the user's password hash.
 func (m *UserModel) Get(id int) (User, error) {
-	stmt := `SELECT id, username, email, created, is_admin FROM users WHERE id = ?`
+	stmt := `SELECT id, username, email, created, is_admin, COALESCE(avatar_image, '') FROM users WHERE id = ?`
 	var user User
-	err := m.DB.QueryRow(stmt, id).Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.IsAdmin)
+	err := m.DB.QueryRow(stmt, id).Scan(&user.ID, &user.Name, &user.Email, &user.Created, &user.IsAdmin, &user.AvatarImage)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return User{}, ErrNoRecord
@@ -121,4 +122,28 @@ func (m *UserModel) IsAdmin(id int) (bool, error) {
 	}
 
 	return isAdmin, nil
+}
+
+// SetAvatar returns the old path only after the new path has been committed.
+func (m *UserModel) SetAvatar(userID int, path string) (string, error) {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback()
+	var old string
+	err = tx.QueryRow(`SELECT COALESCE(avatar_image, '') FROM users WHERE id = ? FOR UPDATE`, userID).Scan(&old)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", ErrNoRecord
+	}
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(`UPDATE users SET avatar_image = ? WHERE id = ?`, path, userID); err != nil {
+		return "", err
+	}
+	if err := tx.Commit(); err != nil {
+		return "", err
+	}
+	return old, nil
 }

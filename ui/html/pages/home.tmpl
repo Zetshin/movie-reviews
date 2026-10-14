@@ -22,7 +22,7 @@
       <div class="search-dropdown" hidden><p class="search-status" role="status" aria-live="polite"></p><ul id="movie-search-results" role="listbox"></ul></div>
     </div>
     <div class="account">
-      {{if .IsAuthenticated}}<a class="sign-in" href="/profile">Profile</a><form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle" type="submit">Logout</button></form>{{if .IsAdmin}}<a class="button gold compact" href="/movies/add">Admin</a>{{end}}
+      {{if .IsAuthenticated}}<a class="account-avatar" href="/profile" aria-label="Your profile">{{if .User.AvatarImage}}<img src="{{.User.AvatarImage}}" alt="">{{else}}<span aria-hidden="true">♙</span>{{end}}</a><form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle" type="submit">Logout</button></form>{{if .IsAdmin}}<a class="button gold compact" href="/movies/add">Admin</a>{{end}}
       {{else}}<a class="sign-in" href="/user/login">Login</a><a class="button gold compact" href="/user/signup">Sign up <span aria-hidden="true">↗</span></a>{{end}}
     </div>
   </header>
@@ -42,7 +42,7 @@
     {{if .Movies}}{{range $index, $movie := .Movies}}{{if lt $index 5}}
     <article class="hero-slide" data-slide {{if ne $index 0}}hidden{{end}} aria-label="{{.Title}}">
       <div class="hero-art" aria-hidden="true">{{if .BackdropImage}}<img src="{{.BackdropImage}}" alt="" {{if ne $index 0}}loading="lazy"{{else}}fetchpriority="high"{{end}}>{{else}}<img src="/static/img/cinematic-landscape.svg" alt="">{{end}}</div>
-      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> THE LATEST ADDITION</p>{{if not .BackdropImage}}<p class="art-note">Backdrop unavailable · decorative illustration</p>{{end}}<h1>{{.Title}}</h1>
+      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> THE LATEST RELEASE</p>{{if not .BackdropImage}}<p class="art-note">Backdrop unavailable · decorative illustration</p>{{end}}<h1>{{.Title}}</h1>
       <div class="hero-meta">{{if not .ReleaseDate.IsZero}}<span>{{.ReleaseDate.Format "2006"}}</span><span class="divider">/</span>{{end}}<span class="rating">★ {{if .AvgRating}}{{.AvgRating}}<small> / 5</small>{{else}}Not rated{{end}}</span>{{if .ReviewCount}}<span class="muted">{{.ReviewCount}} reviews</span>{{end}}</div>
       <p class="synopsis">{{if .Description}}{{.Description}}{{else}}Discover this film and see what other movie lovers think.{{end}}</p><a class="button gold" href="/movies/{{.ID}}">Explore the movie <span aria-hidden="true">↗</span></a></div>
     </article>{{end}}{{end}}
@@ -68,7 +68,7 @@
   <div class="section-heading"><div><p class="eyebrow">LOVED BY THE COMMUNITY</p><h2 id="picks-title">Top picks<span class="gold-text">.</span></h2></div><span class="section-note">Good films. Great conversations.</span></div>
   <div class="picks-grid">
   {{if .TopPicks}}{{range $index, $pick := .TopPicks}}{{if lt $index 3}}<article class="pick-card"><div class="pick-top"><a class="pick-poster poster poster-{{$index}}" href="/movies/{{.Movie.ID}}" aria-label="View {{.Movie.Title}}">{{if .Movie.PosterImage}}<img src="{{.Movie.PosterImage}}" alt="{{.Movie.Title}} poster" loading="lazy">{{end}}<span class="poster-fallback" aria-hidden="true">MOVIE<br><b>CLUB TH</b></span></a><div><span class="pick-rank">0{{if eq $index 0}}1{{else if eq $index 1}}2{{else}}3{{end}} / COMMUNITY PICK</span><h3><a href="/movies/{{.Movie.ID}}">{{.Movie.Title}}</a></h3><p class="rating">★ {{.Movie.AvgRating}}<small> / 5</small></p><p class="muted small">{{.Movie.ReviewCount}} reviews</p></div></div><div class="review-preview">{{with .ReviewPreview}}<p class="review-quote">“{{.Review}}”</p><div class="review-author"><span>{{if .Username}}{{.Username}}{{else}}Community reviewer{{end}}</span><span class="rating">★ {{.Rating}} / 5</span></div>{{else}}<p class="review-quote muted">No review preview available yet.</p>{{end}}</div></article>{{end}}{{end}}
-  {{else}}<p class="empty-state">No community picks yet. Movies need an average rating above 4/5 and at least 5 reviews to appear here.</p>{{end}}
+  {{else}}<p class="empty-state">No community picks yet. Movies need an average rating above 4/5 to appear here.</p>{{end}}
   </div>
 </section>
 
