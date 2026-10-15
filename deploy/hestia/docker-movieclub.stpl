@@ -1,0 +1,64 @@
+#=========================================================================#
+# MovieClub TH (Docker) - HTTPS reverse proxy to 127.0.0.1:4010           #
+# Container: movieclub-app (see deploy/hestia/docker-compose.yml)         #
+# Installed by deploy/hestia/install.sh into                              #
+#   /usr/local/hestia/data/templates/web/nginx/                           #
+#=========================================================================#
+
+server {
+	listen      %ip%:%proxy_ssl_port% ssl;
+	server_name %domain_idn% %alias_idn%;
+
+	# Server-level logs so every request counts toward Hestia bandwidth
+	# (v-update-web-domain-traff reads the .bytes file) and web stats.
+	# The default Hestia template only logs static files, so bandwidth of
+	# a proxied app would otherwise always show 0 MB.
+	access_log  /var/log/%web_system%/domains/%domain%.log combined;
+	access_log  /var/log/%web_system%/domains/%domain%.bytes bytes;
+	error_log   /var/log/%web_system%/domains/%domain%.error.log error;
+
+	ssl_certificate     %ssl_pem%;
+	ssl_certificate_key %ssl_key%;
+
+	# TLS 1.3 0-RTT anti-replay
+	if ($anti_replay = 307) { return 307 https://$host$request_uri; }
+	if ($anti_replay = 425) { return 425; }
+
+	include %home%/%user%/conf/web/%domain%/nginx.hsts.conf*;
+
+	# Largest upload is a 12 MB poster/backdrop form; leave headroom.
+	client_max_body_size 16m;
+
+	location ^~ /.well-known/acme-challenge/ {
+		root %sdocroot%;
+	}
+
+	# Never expose dotfiles from the app.
+	location ~ /\.(?!well-known\/) {
+		deny all;
+		return 404;
+	}
+
+	location / {
+		proxy_pass http://127.0.0.1:4010;
+		proxy_http_version 1.1;
+		proxy_set_header Host              $host;
+		# $remote_addr is the real visitor: nginx resolves CF-Connecting-IP
+		# via /etc/nginx/conf.d/cloudflare.inc before this point.
+		proxy_set_header X-Real-IP         $remote_addr;
+		proxy_set_header X-Forwarded-For   $remote_addr;
+		proxy_set_header X-Forwarded-Proto https;
+		proxy_set_header X-Forwarded-Host  $host;
+		proxy_set_header Connection        "";
+		proxy_connect_timeout 10s;
+		proxy_read_timeout    60s;
+		proxy_send_timeout    60s;
+		proxy_redirect off;
+	}
+
+	location /error/ {
+		alias %home%/%user%/web/%domain%/document_errors/;
+	}
+
+	include %home%/%user%/conf/web/%domain%/nginx.ssl.conf_*;
+}

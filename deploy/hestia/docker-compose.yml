@@ -1,0 +1,48 @@
+# Production stack for a HestiaCP server.
+#
+# Hestia's nginx terminates TLS (Let's Encrypt managed by Hestia) and proxies
+# to the app through the custom "docker-movieclub" proxy template. The app
+# uses the server's existing MariaDB through its Unix socket, so the database
+# port is never exposed and no extra database container is needed.
+#
+#   cd /opt/movie-reviews && docker compose up -d
+#
+# Variables come from /opt/movie-reviews/.env (see deploy/hestia/.env.example).
+
+name: movieclub
+
+services:
+  app:
+    image: ${APP_IMAGE:?set APP_IMAGE in .env}
+    container_name: movieclub-app
+    restart: unless-stopped
+    environment:
+      TMDB_API_KEY: ${TMDB_API_KEY:?set TMDB_API_KEY in .env}
+      DB_DSN: ${DB_USER:?set DB_USER in .env}:${DB_PASSWORD:?set DB_PASSWORD in .env}@unix(/run/mysqld/mysqld.sock)/${DB_NAME:?set DB_NAME in .env}
+      DB_MIGRATE: "true"
+      TLS_ENABLED: "false"
+      SECURE_COOKIE: "true"
+      # Only Hestia's nginx can reach 127.0.0.1:4010, so its headers are trusted.
+      TRUST_PROXY: "true"
+      TZ: ${TZ:-Asia/Bangkok}
+    # Loopback only: the public entry point is Hestia's nginx.
+    ports:
+      - "127.0.0.1:${APP_PORT:-4010}:4000"
+    volumes:
+      - /run/mysqld:/run/mysqld
+      - uploads:/app/ui/static/uploads
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  uploads:
