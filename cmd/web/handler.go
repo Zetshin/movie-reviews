@@ -65,21 +65,21 @@ func (app *application) movieSearch(w http.ResponseWriter, r *http.Request) {
 }
 
 func (app *application) home(w http.ResponseWriter, r *http.Request) {
-	// à¸«à¸™à¸±à¸‡à¸§à¸±à¸™à¸‰à¸²à¸¢à¸¥à¹ˆà¸²à¸ªà¸¸à¸”: à¹ƒà¸Šà¹‰à¸—à¸±à¹‰à¸‡ Hero à¹à¸¥à¸° New Movies
+	// หนังวันฉายล่าสุด: ใช้ทั้ง Hero และ New Movies
 	movies, err := app.movies.Latest(6)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// à¸«à¸™à¸±à¸‡à¸—à¸µà¹ˆà¸œà¹ˆà¸²à¸™à¹€à¸à¸“à¸‘à¹Œ Top Picks
+	// หนังที่ผ่านเกณฑ์ Top Picks
 	topMovies, err := app.movies.TopPicks()
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// à¸ˆà¸±à¸šà¸„à¸¹à¹ˆà¸«à¸™à¸±à¸‡à¹à¸•à¹ˆà¸¥à¸°à¹€à¸£à¸·à¹ˆà¸­à¸‡à¸à¸±à¸šà¸£à¸µà¸§à¸´à¸§à¸‚à¸­à¸‡à¹€à¸£à¸·à¹ˆà¸­à¸‡à¸™à¸±à¹‰à¸™
+	// จับคู่หนังแต่ละเรื่องกับรีวิวของเรื่องนั้น
 	var topPicks []HomeTopPick
 
 	for _, movie := range topMovies {
@@ -93,7 +93,7 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 				app.serverError(w, r, err)
 				return
 			}
-			// à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸µà¸§à¸´à¸§à¸œà¹ˆà¸²à¸™à¹€à¸‡à¸·à¹ˆà¸­à¸™à¹„à¸‚: ReviewPreview à¹€à¸›à¹‡à¸™ nil
+			// ไม่มีรีวิวผ่านเงื่อนไข: ReviewPreview เป็น nil
 		} else {
 			pick.ReviewPreview = &review
 		}
@@ -101,14 +101,14 @@ func (app *application) home(w http.ResponseWriter, r *http.Request) {
 		topPicks = append(topPicks, pick)
 	}
 
-	// Home à¹ƒà¸Šà¹‰à¸¥à¸³à¸”à¸±à¸š Trending People à¸—à¸µà¹ˆà¸™à¸³à¹€à¸‚à¹‰à¸²à¸ˆà¸²à¸ TMDB; à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸„à¸™à¹€à¸”à¸´à¸¡à¸¢à¸±à¸‡à¸­à¸¢à¸¹à¹ˆ
+	// Home ใช้ลำดับ Trending People ที่นำเข้าจาก TMDB; ข้อมูลคนเดิมยังอยู่
 	actors, err := app.persons.Trending(6)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
 	}
 
-	// à¸ªà¹ˆà¸‡à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”à¹ƒà¸«à¹‰ Home
+	// ส่งข้อมูลทั้งหมดให้ Home
 	data := app.newTemplateData(r)
 	data.Movies = movies
 	data.TopPicks = topPicks
@@ -238,7 +238,6 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	data.Pagination.TotalPages = totalPages
 	data.Pagination.TotalReviews = totalReviews
 	data.Pagination.Sort = sort
-	data.Pagination.Page = page
 	data.Pagination.PreviousPage = page - 1
 	data.Pagination.NextPage = page + 1
 	app.render(w, r, http.StatusOK, "detail.tmpl", data)
@@ -354,7 +353,7 @@ func (app *application) movieImportOnePost(w http.ResponseWriter, r *http.Reques
 		respond(http.StatusBadRequest, "failed", "Invalid movie ID.")
 		return
 	}
-	movieID, err := app.movies.LocalIDForTMDB(id)
+	_, err = app.movies.LocalIDForTMDB(id)
 	if err != nil && !errors.Is(err, models.ErrNoRecord) {
 		app.logger.Error("could not check TMDB movie", "error", err)
 		respond(http.StatusInternalServerError, "failed", "Could not check the library.")
@@ -365,15 +364,13 @@ func (app *application) movieImportOnePost(w http.ResponseWriter, r *http.Reques
 		state = "imported"
 	}
 	// Existing movie edits are retained while rankings and credits are refreshed.
-	{
-		ctx, cancel := context.WithTimeout(r.Context(), 7*time.Second)
-		defer cancel()
-		movieID, err = app.importTMDBMovieContext(ctx, id)
-		if err != nil {
-			app.logger.Error("TMDB import failed", "tmdb_id", id, "error", err)
-			respond(http.StatusBadGateway, "failed", "Movie import failed. Select again to retry.")
-			return
-		}
+	ctx, cancel := context.WithTimeout(r.Context(), 7*time.Second)
+	defer cancel()
+	movieID, err := app.importTMDBMovieContext(ctx, id)
+	if err != nil {
+		app.logger.Error("TMDB import failed", "tmdb_id", id, "error", err)
+		respond(http.StatusBadGateway, "failed", "Movie import failed. Select again to retry.")
+		return
 	}
 	tasks, err := app.moviePersons.ImportTasks(movieID)
 	if err != nil {
@@ -736,48 +733,6 @@ func (app *application) personSearch(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.Write(payload)
-}
-
-func (app *application) movieReviews(w http.ResponseWriter, r *http.Request) {
-	movieID, err := strconv.Atoi(r.PathValue("movieID"))
-	if err != nil || movieID < 1 {
-		http.NotFound(w, r)
-		return
-	}
-	pageSize := 10
-	page := 1
-	pageString := r.URL.Query().Get("page")
-	if pageString != "" {
-		page, err = strconv.Atoi(pageString)
-		if err != nil || page < 1 {
-			http.NotFound(w, r)
-			return
-		}
-	}
-	sort := r.URL.Query().Get("sort")
-	totalReviews, err := app.reviews.CountByMovieID(movieID)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-	totalPages := (totalReviews + pageSize - 1) / pageSize
-	if page < 1 || (totalPages == 0 && page != 1) || (totalPages > 0 && page > totalPages) {
-		http.NotFound(w, r)
-		return
-	}
-
-	offset := (page - 1) * pageSize
-	reviews, err := app.reviews.ListByMovieID(movieID, sort, pageSize, offset)
-	if err != nil {
-		app.serverError(w, r, err)
-		return
-	}
-
-	data := app.newTemplateData(r)
-	data.Reviews = reviews
-
-	app.render(w, r, http.StatusOK, "detail.tmpl", data)
-
 }
 
 // Create a new userSignupForm struct.
