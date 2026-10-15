@@ -758,9 +758,14 @@ func (app *application) userSignupPost(w http.ResponseWriter, r *http.Request) {
 		app.clientError(w, http.StatusBadRequest)
 		return
 	}
-	// Validate the form contents using our helper functions.
+	form.Name = strings.TrimSpace(form.Name)
+	form.Email = strings.TrimSpace(form.Email)
+	// Validate the form contents using our helper functions. Length limits
+	// match the VARCHAR(255) columns so oversized input is a 422, not a 500.
 	form.CheckField(validator.NotBlank(form.Name), "name", "This field cannot be blank")
+	form.CheckField(validator.MaxChars(form.Name, 255), "name", "This field must be 255 characters or fewer")
 	form.CheckField(validator.NotBlank(form.Email), "email", "This field cannot be blank")
+	form.CheckField(validator.MaxChars(form.Email, 254), "email", "This field must be 254 characters or fewer")
 	form.CheckField(validator.Matches(form.Email, validator.EmailRX), "email", "This field must be a valid email address")
 	form.CheckField(validator.NotBlank(form.Password), "password", "This field cannot be blank")
 	form.CheckField(validator.MinChars(form.Password, 8), "password", "This field must be at least 8 characters long")
@@ -820,7 +825,9 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 	// a UX-nicety (in case the user makes a typo). We also again make sure that
 	// the password provided is no longer than 72 bytes to avoid any bcrypt
 	// truncation issues.
+	form.Email = strings.TrimSpace(form.Email)
 	form.CheckField(validator.NotBlank(form.Email), "email", "This field cannot be blank")
+	form.CheckField(validator.MaxChars(form.Email, 254), "email", "This field must be 254 characters or fewer")
 	form.CheckField(validator.Matches(form.Email, validator.EmailRX), "email", "This field must be a valid email address")
 	form.CheckField(validator.NotBlank(form.Password), "password", "This field cannot be blank")
 	form.CheckField(validator.MaxBytes(form.Password, 72), "password", "This field must not be more than 72 bytes long")
