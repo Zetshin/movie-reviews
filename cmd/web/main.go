@@ -25,6 +25,9 @@ import (
 	"github.com/joho/godotenv"
 )
 
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
 // config holds runtime settings. Every flag can also be set with an
 // environment variable so the same binary works locally and in Docker.
 type config struct {
@@ -240,7 +243,7 @@ func (app *application) serve() error {
 		shutdownErr <- srv.Shutdown(ctx)
 	}()
 
-	app.logger.Info("starting server", "addr", srv.Addr, "tls", app.config.tls)
+	app.logger.Info("starting server", "version", version, "addr", srv.Addr, "tls", app.config.tls)
 	var err error
 	if app.config.tls {
 		err = srv.ListenAndServeTLS(app.config.tlsCert, app.config.tlsKey)
