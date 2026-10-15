@@ -41,12 +41,15 @@ func TestClientIP(t *testing.T) {
 		name       string
 		trustProxy bool
 		forwarded  string
+		realIP     string
 		want       string
 	}{
-		{"direct", false, "", "192.0.2.1"},
-		{"spoofed header ignored", false, "203.0.113.9", "192.0.2.1"},
-		{"trusted proxy", true, "203.0.113.9", "203.0.113.9"},
-		{"last hop wins", true, "10.0.0.1, 203.0.113.9", "203.0.113.9"},
+		{"direct", false, "", "", "192.0.2.1"},
+		{"spoofed header ignored", false, "203.0.113.9", "203.0.113.8", "192.0.2.1"},
+		{"trusted proxy", true, "203.0.113.9", "", "203.0.113.9"},
+		{"last hop wins", true, "10.0.0.1, 203.0.113.9", "", "203.0.113.9"},
+		{"x-real-ip preferred", true, "6.6.6.6, 203.0.113.9", "198.51.100.7", "198.51.100.7"},
+		{"invalid x-real-ip ignored", true, "203.0.113.9", "not-an-ip", "203.0.113.9"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -55,6 +58,9 @@ func TestClientIP(t *testing.T) {
 			r.RemoteAddr = "192.0.2.1:5555"
 			if tt.forwarded != "" {
 				r.Header.Set("X-Forwarded-For", tt.forwarded)
+			}
+			if tt.realIP != "" {
+				r.Header.Set("X-Real-IP", tt.realIP)
 			}
 			if got := app.clientIP(r); got != tt.want {
 				t.Errorf("clientIP() = %q, want %q", got, tt.want)
@@ -93,6 +99,12 @@ func TestRateLimiter(t *testing.T) {
 	now = now.Add(time.Minute + time.Second)
 	if !limiter.allow("a") {
 		t.Fatal("window should reset")
+	}
+	// Expired clients are swept so the map does not grow forever.
+	now = now.Add(3 * time.Minute)
+	limiter.allow("c")
+	if _, ok := limiter.clients["b"]; ok {
+		t.Fatal("expired entries should be removed")
 	}
 }
 

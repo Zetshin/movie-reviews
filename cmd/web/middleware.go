@@ -125,6 +125,11 @@ func (app *application) isHTTPS(r *http.Request) bool {
 // otherwise any client could spoof its address.
 func (app *application) clientIP(r *http.Request) string {
 	if app.config.trustProxy {
+		// nginx sets X-Real-IP to the client address it resolved (after its
+		// own real_ip handling, e.g. Cloudflare's CF-Connecting-IP).
+		if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); net.ParseIP(ip) != nil {
+			return ip
+		}
 		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
 			// The proxy appends the address it saw as the last entry.
 			parts := strings.Split(forwarded, ",")
@@ -167,11 +172,12 @@ func limitFormBody(next http.Handler) http.Handler {
 // rateLimiter is a small fixed-window limiter keyed by client IP. It protects
 // login and signup from password guessing and bcrypt-driven CPU exhaustion.
 type rateLimiter struct {
-	mu      sync.Mutex
-	limit   int
-	window  time.Duration
-	clients map[string]*rateWindow
-	now     func() time.Time
+	mu        sync.Mutex
+	limit     int
+	window    time.Duration
+	clients   map[string]*rateWindow
+	now       func() time.Time
+	nextSweep time.Time
 }
 
 type rateWindow struct {
@@ -188,13 +194,15 @@ func (l *rateLimiter) allow(key string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	now := l.now()
-	// Drop expired entries so the map cannot grow without bound.
-	if len(l.clients) > 10000 {
+	// Drop expired entries once per window so the map cannot grow without
+	// bound, without scanning it on every request.
+	if now.After(l.nextSweep) {
 		for k, entry := range l.clients {
 			if now.After(entry.reset) {
 				delete(l.clients, k)
 			}
 		}
+		l.nextSweep = now.Add(l.window)
 	}
 	entry, ok := l.clients[key]
 	if !ok || now.After(entry.reset) {
