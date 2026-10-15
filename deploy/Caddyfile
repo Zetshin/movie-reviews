@@ -4,8 +4,12 @@
 	# Caddy sets X-Forwarded-For/Proto and overwrites any client-supplied
 	# values, which is what lets the app run with TRUST_PROXY=true.
 	reverse_proxy app:4000 {
-		health_uri /healthz
-		health_interval 30s
+		# While the app container restarts during a deploy, hold requests
+		# for up to 15s instead of failing them. Active health checks are
+		# deliberately not used: they keep the upstream marked down until
+		# the next interval, causing 503s after a successful restart.
+		lb_try_duration 15s
+		lb_try_interval 250ms
 	}
 
 	# Uploaded files and static assets can be cached by browsers.
