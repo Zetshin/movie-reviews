@@ -915,8 +915,8 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	app.sessionManager.Put(r.Context(), "authenticatedAuthVersion", version)
-	// Redirect the user to the create snippet page.
-	http.Redirect(w, r, "/movies/", http.StatusSeeOther)
+	// Return signed-in users to the home page.
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {

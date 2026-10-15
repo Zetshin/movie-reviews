@@ -217,19 +217,18 @@ func (m *ReviewModel) CountByMovieID(movieID int) (int, error) {
 
 func (m *ReviewModel) GetRandom(movieID int) (Review, error) {
 	stmt := `SELECT r.id, r.movie_id, r.user_id, r.rating,
-                r.review_text, r.created_at, r.updated_at,
+			r.review_text, r.is_spoiler, r.created_at, r.updated_at,
                 u.username, COALESCE(u.avatar_image, '')
          FROM reviews AS r
          JOIN users AS u ON r.user_id = u.id
          WHERE r.movie_id = ?
          AND   r.rating >= 3
-		 AND   r.is_spoiler = FALSE
          ORDER BY RAND()
          LIMIT 1`
 
 	row := m.DB.QueryRow(stmt, movieID)
 	var r Review
-	err := row.Scan(&r.ID, &r.MovieID, &r.UserID, &r.Rating, &r.Review, &r.CreatedAt, &r.UpdatedAt, &r.Username, &r.AvatarImage)
+	err := row.Scan(&r.ID, &r.MovieID, &r.UserID, &r.Rating, &r.Review, &r.IsSpoiler, &r.CreatedAt, &r.UpdatedAt, &r.Username, &r.AvatarImage)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return Review{}, ErrNoRecord
