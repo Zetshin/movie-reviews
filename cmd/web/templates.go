@@ -65,10 +65,13 @@ type templateData struct {
 	ReturnMovie     models.Movie
 }
 
-// Create a humanDate function which returns a nicely formatted string
-// representation of a time.Time value.
+// humanDate formats a timestamp for visitors. Timestamps are stored in UTC,
+// so convert them to the server's display zone (TZ, e.g. Asia/Bangkok).
 func humanDate(t time.Time) string {
-	return t.Format("02 Jan 2006 at 15:04")
+	if t.IsZero() {
+		return ""
+	}
+	return t.In(time.Local).Format("02 Jan 2006 at 15:04")
 }
 
 // Initialize a template.FuncMap value and store it in a global variable. This is

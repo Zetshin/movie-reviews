@@ -1,32 +1,36 @@
-# เว็บแอปพลิเคชันรีวิวภาพยนตร์ (Movie Reviews)
+# เว็บแอปพลิเคชันรีวิวภาพยนตร์ (MovieClub TH)
 
-โปรเจกต์สำหรับฝึกพัฒนาเว็บด้วย Go และ MySQL แสดงผลผ่านหน้า HTML สำหรับดูรายการภาพยนตร์ เพิ่มภาพยนตร์ และอ่านรีวิว ปัจจุบันยังอยู่ระหว่างพัฒนา โดยเส้นทางสมัครสมาชิก เข้าสู่ระบบ และส่งรีวิวยังตอบกลับเป็นข้อความตัวอย่าง
+[![CI](https://github.com/Zetshin/movie-reviews/actions/workflows/ci.yml/badge.svg)](https://github.com/Zetshin/movie-reviews/actions/workflows/ci.yml)
+
+เว็บไซต์: <https://movieclubth.com>
+
+เว็บรีวิวภาพยนตร์เขียนด้วย Go และ MySQL/MariaDB เรนเดอร์ HTML ฝั่งเซิร์ฟเวอร์ ดึงข้อมูลภาพยนตร์และนักแสดงจาก TMDB ผู้ใช้สมัครสมาชิก เขียน/แก้ไขรีวิว และอัปโหลดรูปโปรไฟล์ได้ ผู้ดูแลระบบจัดการคลังภาพยนตร์และนักแสดงได้
 
 ## สารบัญ
 
-- [ฟีเจอร์และสถานะปัจจุบัน](#features)
+- [ฟีเจอร์](#features)
 - [เทคโนโลยีที่ใช้](#tech-stack)
 - [โครงสร้างโปรเจกต์](#project-structure)
-- [วิธีติดตั้งและเริ่มใช้งาน](#getting-started)
+- [เริ่มใช้งานด้วย Docker (แนะนำ)](#docker)
+- [รันในเครื่องโดยไม่ใช้ Docker](#local)
+- [การตั้งค่า](#configuration)
+- [Deploy ขึ้นเซิร์ฟเวอร์ (HestiaCP)](#deploy)
+- [CI/CD](#ci-cd)
+- [ความปลอดภัย](#security)
 - [เส้นทาง HTTP](#http-routes)
-- [โมเดลฐานข้อมูล](#database-models)
-- [แผนภาพฐานข้อมูล](#database-diagrams)
+- [ฐานข้อมูล](#database)
 - [ข้อจำกัดปัจจุบัน](#known-limitations)
 
 <a id="features"></a>
 
-## ฟีเจอร์และสถานะปัจจุบัน
+## ฟีเจอร์
 
-- แสดงภาพยนตร์ที่เพิ่มล่าสุด 10 เรื่อง เรียงตาม ID จากมากไปน้อย
-- แสดงรายละเอียดภาพยนตร์พร้อมรีวิว โดยแบ่งรีวิวหน้าละ 10 รายการ
-- เรียงรีวิวจากใหม่ไปเก่าเป็นค่าเริ่มต้น หรือเรียงตามจำนวนไลก์ด้วย `?sort=popular`
-- เพิ่มภาพยนตร์ผ่านฟอร์ม HTML พร้อมตรวจสอบชื่อเรื่องและวันที่เข้าฉาย
-- แสดงข้อความแจ้งผลหลังเพิ่มภาพยนตร์สำเร็จ โดยเก็บข้อความชั่วคราวไว้ในเซสชัน
-- แคชเทมเพลต HTML ตอนเริ่มโปรแกรม และให้บริการไฟล์ CSS, JavaScript และรูปภาพ
-- ให้บริการผ่าน HTTPS พร้อมบันทึกคำขอ จัดการ panic ตั้งค่า HTTP headers ด้านความปลอดภัย และกำหนดเวลารอของเซิร์ฟเวอร์
-- เก็บเซสชันใน MySQL กำหนดอายุ 12 ชั่วโมง และตั้งค่าคุกกี้เป็น `Secure`
-
-หน้าแรกมีโค้ดที่สั่งให้เกิด panic และ middleware จะจัดการโดยตอบกลับ HTTP 500 จึงควรเริ่มใช้งานที่ `/movies/` แทน `/`
+- หน้าแรกแสดง Hero จากภาพยนตร์ยอดนิยมบน TMDB, ภาพยนตร์ใหม่, Top Picks พร้อมตัวอย่างรีวิว และนักแสดงที่กำลังมาแรง
+- รายการภาพยนตร์และนักแสดงแบบแบ่งหน้า ค้นหาแบบ dropdown (`/movies/search`, `/actors/search`)
+- หน้ารายละเอียดภาพยนตร์พร้อมนักแสดง รีวิวแบ่งหน้าละ 10 รายการ เรียงล่าสุดหรือ `?sort=popular`
+- สมัครสมาชิก / เข้าสู่ระบบ / ออกจากระบบ (bcrypt) เขียนและแก้ไขรีวิว (0.5–5 ดาว, ซ่อนสปอยล์ได้) อัปโหลดรูปโปรไฟล์
+- ผู้ดูแลระบบ: นำเข้าภาพยนตร์/นักแสดงจาก TMDB เพิ่ม แก้ไข ลบ และอัปโหลดโปสเตอร์/ภาพพื้นหลัง
+- คะแนนเฉลี่ยและจำนวนรีวิวคำนวณใหม่ใน transaction เดียวกับการเขียนรีวิว
 
 <a id="tech-stack"></a>
 
@@ -34,17 +38,14 @@
 
 | ส่วนประกอบ | เทคโนโลยี |
 |------------|-----------|
-| ภาษา | Go โดย `go.mod` ระบุ `go 1.27.1` |
-| เว็บเซิร์ฟเวอร์และการกำหนดเส้นทาง | ไลบรารีมาตรฐาน `net/http` |
-| ฐานข้อมูล | MySQL ผ่าน `database/sql` และ `github.com/go-sql-driver/mysql` |
-| เทมเพลต | ไลบรารีมาตรฐาน `html/template` |
-| การบันทึก log | ไลบรารีมาตรฐาน `log/slog` |
-| การเรียงลำดับ middleware | `github.com/justinas/alice` |
-| เซสชัน | `github.com/alexedwards/scs/v2` ร่วมกับ `scs/mysqlstore` |
-| การแปลงข้อมูลจากฟอร์ม | `github.com/go-playground/form/v4` |
-| ส่วนติดต่อผู้ใช้ | HTML, CSS และ JavaScript |
-
-เวอร์ชันของแพ็กเกจที่ใช้ระบุไว้ใน [go.mod](./go.mod) และ [go.sum](./go.sum)
+| ภาษา | Go 1.27 (toolchain `go1.27.2`) |
+| เว็บเซิร์ฟเวอร์ | `net/http`, `github.com/justinas/alice` |
+| ฐานข้อมูล | MySQL 8 หรือ MariaDB 10.6+ ผ่าน `database/sql` + `go-sql-driver/mysql`, migration ฝังในไบนารี |
+| เซสชัน / CSRF | `alexedwards/scs` (เก็บใน MySQL), `justinas/nosurf` |
+| ข้อมูลภาพยนตร์ | TMDB API |
+| คอนเทนเนอร์ | Docker (distroless, non-root), Docker Compose |
+| Production | HestiaCP (nginx + Let's Encrypt) อยู่หลัง Cloudflare, MariaDB ของเซิร์ฟเวอร์ |
+| CI/CD | GitHub Actions, GHCR |
 
 <a id="project-structure"></a>
 
@@ -52,240 +53,195 @@
 
 ```text
 movie-reviews/
-|-- cmd/web/
-|   |-- main.go              # ตั้งค่าโปรแกรม ฐานข้อมูล เซสชัน และเซิร์ฟเวอร์ HTTPS
-|   |-- routes.go            # กำหนดเส้นทางและลำดับ middleware
-|   |-- handler.go           # จัดการหน้าเว็บ ฟอร์ม และเส้นทางที่ยังเป็นตัวอย่าง
-|   |-- middleware.go        # ตั้งค่า headers บันทึกคำขอ และจัดการ panic
-|   |-- helpers.go           # แสดงผล จัดการข้อผิดพลาด แปลงฟอร์ม และเตรียมข้อมูลร่วม
-|   `-- templates.go         # แคชเทมเพลต ฟังก์ชัน และชนิดข้อมูลสำหรับหน้าเว็บ
+|-- cmd/web/                  # main, routes, handlers, middleware, templates
 |-- internal/
-|   |-- models/
-|   |   |-- movies.go        # อ่านและเพิ่มข้อมูลภาพยนตร์
-|   |   |-- review.go        # อ่าน เพิ่ม แก้ไข และลบรีวิว
-|   |   |-- persons.go       # อ่านและเพิ่มข้อมูลบุคคล
-|   |   |-- movie_person.go  # นักแสดง ผลงาน และความสัมพันธ์กับภาพยนตร์
-|   |   `-- errors.go        # ข้อผิดพลาด ErrNoRecord
-|   `-- validator/
-|       `-- validator.go     # ฟังก์ชันตรวจสอบข้อมูลฟอร์ม
-|-- ui/
-|   |-- html/
-|   |   |-- base.tmpl
-|   |   |-- partials/nav.tmpl
-|   |   `-- pages/           # หน้า movies, detail, add; ไฟล์ home และ review ยังว่าง
-|   `-- static/              # CSS, JavaScript และรูปภาพ
-|-- docs/                    # แผนภาพฐานข้อมูล
-|-- tls/                     # cert.pem และ key.pem ในเครื่อง ไม่ติดตามด้วย Git
-|-- go.mod
-`-- go.sum
+|   |-- models/               # SQL ของแต่ละตาราง
+|   |   `-- migrations/       # สคีมาฐานข้อมูล (ฝังในไบนารีด้วย go:embed)
+|   |-- tmdb/                 # TMDB API client
+|   `-- validator/            # ตรวจสอบข้อมูลฟอร์ม
+|-- ui/html, ui/static/       # เทมเพลตและไฟล์ static
+|-- deploy/hestia/            # production บน HestiaCP: proxy template, compose, สคริปต์
+|-- .github/workflows/        # ci.yml, deploy.yml
+|-- Dockerfile
+|-- docker-compose.yml        # app + MySQL (ใช้ในเครื่อง)
+`-- .env.example
 ```
 
-<a id="getting-started"></a>
+<a id="docker"></a>
 
-## วิธีติดตั้งและเริ่มใช้งาน
+## เริ่มใช้งานด้วย Docker (แนะนำ)
 
-### 1. เตรียมเครื่องมือและดาวน์โหลดโปรเจกต์
-
-- Go เวอร์ชันที่รองรับข้อกำหนด `go 1.27.1` ใน `go.mod` 
-- เซิร์ฟเวอร์ MySQL ที่กำลังทำงาน และบัญชีที่มีสิทธิ์สร้างฐานข้อมูลสำหรับพัฒนา
-- ใบรับรอง TLS และ private key สำหรับใช้งานในเครื่อง ตามขั้นตอนด้านล่าง
+ต้องมี Docker 24+ และ TMDB API key
 
 ```sh
 git clone https://github.com/Zetshin/movie-reviews.git
 cd movie-reviews
+cp .env.example .env          # ใส่ TMDB_API_KEY และตั้งรหัสผ่าน MySQL
+docker compose up -d --build
+```
+
+เปิด <http://localhost:4000> ระบบสร้างตารางให้อัตโนมัติตอนเริ่ม (`DB_MIGRATE=true`) ข้อมูล MySQL และไฟล์อัปโหลดเก็บใน volume `db-data` และ `uploads`
+
+นำเข้าข้อมูลตั้งต้นจาก TMDB:
+
+```sh
+docker compose run --rm app -import-tmdb 20 -import-person-details -import-trending-people 12
+```
+
+ตั้งผู้ใช้เป็นผู้ดูแลระบบ (สมัครสมาชิกผ่านหน้าเว็บก่อน):
+
+```sh
+docker compose exec db sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" \
+  -e "UPDATE users SET is_admin = TRUE WHERE email = '\''you@example.com'\''"'
+```
+
+คำสั่งอื่นที่ใช้บ่อย: `docker compose logs -f app`, `docker compose down` (เก็บข้อมูลไว้), `docker compose down -v` (ลบข้อมูลทั้งหมด)
+
+<a id="local"></a>
+
+## รันในเครื่องโดยไม่ใช้ Docker
+
+ต้องมี Go ตาม `go.mod` และ MySQL 8 ที่สร้างฐานข้อมูล `movies` กับผู้ใช้ไว้แล้ว
+
+```sh
 go mod download
+# HTTPS ในเครื่อง: สร้างใบรับรอง self-signed ใน ./tls
+mkdir -p tls && (cd tls && go run "$(go env GOROOT)/src/crypto/tls/generate_cert.go" -host "localhost,127.0.0.1,::1")
+
+export TMDB_API_KEY=...
+go run ./cmd/web -migrate -dsn "movie_app:password@tcp(localhost:3306)/movies"
 ```
 
-รันคำสั่งของแอปพลิเคชันจากโฟลเดอร์หลักของโปรเจกต์ เพราะโปรแกรมโหลดเทมเพลต ไฟล์ static และไฟล์ TLS โดยอ้างอิงพาธจากโฟลเดอร์ที่รัน
+เปิด <https://localhost:4000> หรือถ้าไม่อยากใช้ HTTPS ให้เพิ่ม `-tls=false -secure-cookie=false`
 
-### 2. สร้างฐานข้อมูลสำหรับพัฒนา
+ทดสอบ: `go test ./...`
 
-โปรเจกต์ยังไม่มีไฟล์ migration หรือสคริปต์เพิ่มข้อมูลเริ่มต้น SQL ด้านล่างเป็นตัวอย่างโครงสร้างสำหรับ **ฐานข้อมูลใหม่เพื่อใช้พัฒนา** โดยอ้างอิงคำสั่ง SQL ในโค้ดปัจจุบัน รวมตาราง `review_likes` ที่คำสั่งอ่านรีวิวต้องใช้ JOIN แม้ยังไม่มีรีวิว และตาราง `sessions` สำหรับจัดเก็บเซสชัน
+<a id="configuration"></a>
 
-รัน SQL นี้ผ่านโปรแกรมจัดการ MySQL:
+## การตั้งค่า
 
-```sql
-CREATE DATABASE movies CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE movies;
+ทุกตัวเลือกตั้งได้ทั้งผ่าน flag และ environment variable (flag มีลำดับความสำคัญสูงกว่า) โปรแกรมอ่าน `.env` ในโฟลเดอร์ที่รันด้วย
 
-CREATE TABLE movies (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    title        VARCHAR(255) NOT NULL,
-    description  TEXT NOT NULL,
-    release_date DATE NOT NULL,
-    poster_image TEXT NOT NULL,
-    review_count INT NOT NULL DEFAULT 0,
-    avg_rating   DECIMAL(3,2) NOT NULL DEFAULT 0.00
-);
+| Flag | Env | ค่าเริ่มต้น | คำอธิบาย |
+|------|-----|-------------|----------|
+| — | `TMDB_API_KEY` | (จำเป็น) | API key ของ TMDB |
+| `-dsn` | `DB_DSN` | `user:pass@/movies` | สตริงเชื่อมต่อ MySQL/MariaDB (TCP หรือ `unix(/path/mysqld.sock)`) โปรแกรมเติม `parseTime=true` และ `time_zone='+00:00'` ให้เอง |
+| — | `TZ` | ของระบบ | เขตเวลาที่ใช้แสดงวันที่บนหน้าเว็บ เช่น `Asia/Bangkok` (ในฐานข้อมูลเก็บเป็น UTC เสมอ) |
+| `-addr` | `ADDR` | `:4000` | ที่อยู่ที่เซิร์ฟเวอร์รับการเชื่อมต่อ |
+| `-tls` | `TLS_ENABLED` | `true` | ให้บริการ HTTPS เอง (ใน Docker เป็น `false` เพราะ reverse proxy ทำ TLS ให้) |
+| `-tls-cert`, `-tls-key` | `TLS_CERT_FILE`, `TLS_KEY_FILE` | `./tls/cert.pem`, `./tls/key.pem` | ไฟล์ใบรับรอง |
+| `-secure-cookie` | `SECURE_COOKIE` | `true` | ตั้งคุกกี้เป็น `Secure` และส่ง HSTS ปิดได้เฉพาะตอนทดสอบผ่าน HTTP |
+| `-trust-proxy` | `TRUST_PROXY` | `false` | เชื่อ `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto` เปิดเฉพาะเมื่ออยู่หลัง reverse proxy ที่ไว้ใจได้ |
+| `-migrate` | `DB_MIGRATE` | `false` | สร้าง/อัปเดตตารางก่อนเริ่มเซิร์ฟเวอร์ |
+| `-healthcheck` | — | — | เรียก `/healthz` ของตัวเองแล้วจบ (ใช้กับ Docker HEALTHCHECK) |
 
-CREATE TABLE persons (
-    id            INT AUTO_INCREMENT PRIMARY KEY,
-    name          VARCHAR(255) NOT NULL,
-    bio           TEXT NOT NULL,
-    birth_date    DATE NOT NULL,
-    profile_image TEXT NOT NULL
-);
+คำสั่งนำเข้าข้อมูล (ทำงานเสร็จแล้วจบโปรแกรม): `-import-tmdb N`, `-import-person-details`, `-import-trending-people N`, `-sync-tmdb-metadata`, `-migrate-catalog-metadata`
 
-CREATE TABLE movie_person (
-    movie_id  INT NOT NULL,
-    person_id INT NOT NULL,
-    role      VARCHAR(100) NOT NULL,
-    PRIMARY KEY (movie_id, person_id),
-    FOREIGN KEY (movie_id) REFERENCES movies(id),
-    FOREIGN KEY (person_id) REFERENCES persons(id)
-);
+<a id="deploy"></a>
 
-CREATE TABLE users (
-    id         INT AUTO_INCREMENT PRIMARY KEY,
-    username   VARCHAR(255) NOT NULL,
-    email      VARCHAR(255) NOT NULL,
-    password   VARCHAR(255) NOT NULL,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
+## Deploy ขึ้นเซิร์ฟเวอร์ (HestiaCP)
 
-CREATE TABLE reviews (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    movie_id    INT NOT NULL,
-    user_id     INT NOT NULL,
-    rating      INT NOT NULL,
-    review_text TEXT NOT NULL,
-    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (movie_id) REFERENCES movies(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
+Production รันอยู่ที่ <https://movieclubth.com> บนเซิร์ฟเวอร์ HestiaCP โครงสร้างคือ
 
-CREATE TABLE review_likes (
-    review_id INT NOT NULL,
-    user_id   INT NOT NULL,
-    PRIMARY KEY (review_id, user_id),
-    FOREIGN KEY (review_id) REFERENCES reviews(id),
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
-CREATE TABLE sessions (
-    token  CHAR(43) COLLATE utf8mb4_bin PRIMARY KEY,
-    data   BLOB NOT NULL,
-    expiry TIMESTAMP(6) NOT NULL,
-    INDEX sessions_expiry_idx (expiry)
-);
+```text
+ผู้ใช้ → Cloudflare → nginx ของ Hestia (TLS, Let's Encrypt, proxy template "docker-movieclub")
+       → 127.0.0.1:4010 → คอนเทนเนอร์ movieclub-app → MariaDB ของเซิร์ฟเวอร์ (ผ่าน Unix socket)
 ```
 
-ตาราง `users` เป็นตัวอย่างสำหรับรองรับความสัมพันธ์กับรีวิว ปัจจุบันยังไม่มีโมเดลผู้ใช้หรือระบบยืนยันตัวตนที่ใช้งานได้ หน้าเว็บแสดงคะแนนเต็ม 5 แต่โมเดลรีวิวยังไม่ตรวจสอบช่วงคะแนน ส่วน `PersonModel.Get` ใช้ชื่อคอลัมน์ไม่ตรงกับรูปแบบ snake_case ในตัวอย่างข้างต้น ดูรายละเอียดใน [ข้อจำกัดปัจจุบัน](#known-limitations)
+- แอปรันเป็นคอนเทนเนอร์เดียว (`deploy/hestia/docker-compose.yml`) เปิดพอร์ตแค่ loopback และใช้ฐานข้อมูลที่สร้างใน Hestia ผ่าน socket `/run/mysqld/mysqld.sock` จึงไม่ต้องเปิดพอร์ตฐานข้อมูล
+- Proxy template `docker-movieclub` (`deploy/hestia/*.tpl|.stpl`) ส่งต่อไปที่แอป และบันทึก access log กับ `.bytes` ระดับ server ทำให้แผง Hestia แสดง **Bandwidth** และ AWStats ของโดเมนได้ (template ปกติของ Hestia บันทึกเฉพาะไฟล์ static แอปที่ proxy จึงขึ้น 0 MB เสมอ) Hestia จะรวม bandwidth ทุกคืนด้วย cron `v-update-sys-queue traffic`
 
-สร้างบัญชีฐานข้อมูลสำหรับแอปพลิเคชัน โดยเปลี่ยนรหัสผ่านตัวอย่างก่อนใช้งาน:
+### เตรียมเซิร์ฟเวอร์ (ครั้งเดียว)
 
-```sql
-CREATE USER 'movie_app'@'localhost' IDENTIFIED BY 'change-this-password';
-GRANT SELECT, INSERT, UPDATE, DELETE ON movies.* TO 'movie_app'@'localhost';
-```
+1. ใน Hestia: เพิ่ม web domain และเปิด SSL (Let's Encrypt) แล้วสร้างฐานข้อมูล MySQL ของผู้ใช้เจ้าของโดเมน
+2. คัดลอกไฟล์ใน `deploy/hestia/` ไปที่ `/opt/movie-reviews/` (`install.sh` และไฟล์ template ไว้ใน `/opt/movie-reviews/hestia/`)
+3. สร้าง `/opt/movie-reviews/.env` จาก `deploy/hestia/.env.example` แล้ว `chmod 600`
+4. ติดตั้ง proxy template และเปิดสถิติ: `bash /opt/movie-reviews/hestia/install.sh <hestia-user> <domain>`
+5. เริ่มแอป: `cd /opt/movie-reviews && sh deploy.sh ghcr.io/zetshin/movie-reviews:latest`
 
-คอลัมน์ที่โมเดลอ่านควรมีค่าที่ไม่ใช่ `NULL` เพราะโค้ดอ่านลงตัวแปรชนิดสตริง จำนวนเต็ม และ `time.Time` โดยตรง และต้องมี `parseTime=true` ในสตริงเชื่อมต่อเพื่ออ่านคอลัมน์วันที่และเวลา
+ตารางจะถูกสร้างหรืออัปเดตให้อัตโนมัติตอนเริ่ม ถ้าเป็นฐานข้อมูลเดิมที่สร้างตาม README เวอร์ชันเก่า migration `0002` จะเติมคอลัมน์และ index ที่ขาดให้
 
-### 3. ตั้งค่า HTTPS ในเครื่อง
+### ตั้งค่า GitHub (Settings → Secrets and variables → Actions)
 
-เซิร์ฟเวอร์ต้องใช้ `tls/cert.pem` และ `tls/key.pem` ซึ่ง Git ไม่ติดตาม จึงต้องเตรียมไฟล์เหล่านี้ในเครื่อง หากยังไม่มี สามารถสร้างใบรับรองแบบลงนามด้วยตนเองสำหรับพัฒนาด้วยเครื่องมือที่มาพร้อม Go
+| ประเภท | ชื่อ | ค่า |
+|--------|------|-----|
+| Secret | `DEPLOY_HOST` | IP/โดเมนของเซิร์ฟเวอร์ |
+| Secret | `DEPLOY_USER` | ผู้ใช้ SSH ที่สั่ง `docker` ได้ |
+| Secret | `DEPLOY_SSH_KEY` | private key ที่ใช้ deploy เท่านั้น (ed25519) |
+| Secret | `DEPLOY_KNOWN_HOSTS` | ผลลัพธ์ของ `ssh-keyscan -t ed25519 <host>` |
+| Secret | `DEPLOY_PORT` | (ไม่บังคับ) พอร์ต SSH ค่าเริ่มต้น 22 |
+| Variable | `DEPLOY_PATH` | (ไม่บังคับ) ค่าเริ่มต้น `/opt/movie-reviews` |
+| Variable | `APP_URL` | (ไม่บังคับ) เช่น `https://movieclubth.com` ใช้ตรวจ `/healthz` หลัง deploy |
 
-สำหรับ PowerShell ให้เริ่มจากโฟลเดอร์หลักของโปรเจกต์:
+ถ้า package บน GHCR เป็น private เซิร์ฟเวอร์จะ login ด้วย token ชั่วคราวของ workflow ให้เอง
 
-```powershell
-New-Item -ItemType Directory -Force tls | Out-Null
-Push-Location tls
-go run "$(go env GOROOT)/src/crypto/tls/generate_cert.go" -host "localhost,127.0.0.1,::1"
-Pop-Location
-```
+Deploy ด้วยมือบนเซิร์ฟเวอร์: `cd /opt/movie-reviews && sh deploy.sh ghcr.io/zetshin/movie-reviews:sha-<commit>`
 
-สำหรับ Bash ให้เริ่มจากโฟลเดอร์หลักของโปรเจกต์:
+ตั้งผู้ดูแลระบบ: สมัครสมาชิกผ่านหน้าเว็บ แล้วรัน `UPDATE users SET is_admin = TRUE WHERE email = '...'` ในฐานข้อมูล (ผ่าน phpMyAdmin ของ Hestia หรือ `mariadb`)
+
+นำเข้าข้อมูลจาก TMDB บน production:
 
 ```sh
-mkdir -p tls
-cd tls
-go run "$(go env GOROOT)/src/crypto/tls/generate_cert.go" -host "localhost,127.0.0.1,::1"
-cd ..
+cd /opt/movie-reviews && docker compose run --rm app -import-tmdb 20 -import-person-details -import-trending-people 12
 ```
 
-เครื่องมือนี้จะเขียนทับ `cert.pem` และ `key.pem` หากมีอยู่แล้วในโฟลเดอร์ที่รัน เบราว์เซอร์จะแสดงคำเตือนเกี่ยวกับใบรับรอง เนื่องจากเป็นใบรับรองที่ลงนามด้วยตนเอง
+<a id="ci-cd"></a>
 
-### 4. รันแอปพลิเคชัน
+## CI/CD
 
-```sh
-go run ./cmd/web -dsn "movie_app:change-this-password@tcp(localhost:3306)/movies?parseTime=true"
-```
+- **CI** (`.github/workflows/ci.yml`) ทำงานทุก push ไป `main` และทุก pull request: `gofmt`, `go mod tidy`, `go vet`, `staticcheck`, `go test -race`, `govulncheck` จากนั้น build Docker image รัน compose stack จริงกับ MySQL ทดสอบ route หลักและ migration ตรวจไฟล์ compose ของ Hestia และสแกน image ด้วย Trivy
+- **Deploy** (`.github/workflows/deploy.yml`) ทำงานเมื่อ CI ผ่านบน `main` (หรือกดรันเองได้): build commit ที่ผ่าน CI → push ไป `ghcr.io/<owner>/movie-reviews:sha-<commit>` และ `:latest` → SSH เข้าเซิร์ฟเวอร์ → `deploy.sh` ดึง image ใหม่ รอจน healthy และ **rollback อัตโนมัติ** ถ้า image ใหม่ไม่ healthy ถ้ายังไม่ได้ตั้ง secrets ขั้น deploy จะหยุดพร้อมบอกว่าขาดตัวไหน
+- **Dependabot** อัปเดต Go modules, base images และ actions ทุกสัปดาห์
 
-เปิด [https://localhost:4000/movies/](https://localhost:4000/movies/) ฐานข้อมูลใหม่จะยังไม่มีภาพยนตร์ สามารถเพิ่มได้ที่ [หน้าเพิ่มภาพยนตร์](https://localhost:4000/movies/add)
+<a id="security"></a>
 
-| ตัวเลือก | ค่าเริ่มต้น | คำอธิบาย |
-|----------|-------------|----------|
-| `-addr` | `:4000` | ที่อยู่และพอร์ตที่เซิร์ฟเวอร์ HTTPS รับการเชื่อมต่อ |
-| `-dsn` | `user:pass@/movies?parseTime=true` | สตริงเชื่อมต่อ MySQL ต้องเปลี่ยนชื่อผู้ใช้และรหัสผ่านให้ตรงกับฐานข้อมูล |
+## ความปลอดภัย
 
-หากต้องการเปลี่ยนพอร์ต:
-
-```sh
-go run ./cmd/web -addr ":8080" -dsn "movie_app:change-this-password@tcp(localhost:3306)/movies?parseTime=true"
-```
-
-จากนั้นเปิด [https://localhost:8080/movies/](https://localhost:8080/movies/) เซิร์ฟเวอร์ให้บริการผ่าน HTTPS เท่านั้น ยังไม่มีตัวรับการเชื่อมต่อ HTTP เพื่อเปลี่ยนเส้นทางไป HTTPS
+- รหัสผ่าน bcrypt (cost 12), ป้องกัน user enumeration ด้วยการใช้เวลาเท่ากันเมื่อไม่พบอีเมล
+- CSRF token ทุก POST + ตรวจ Origin, คุกกี้ `HttpOnly`, `Secure`, `SameSite=Lax`, เปลี่ยน session token ตอน login/logout
+- จำกัด POST ของ login/signup 10 ครั้ง/นาที/IP, จำกัดขนาด body (ฟอร์ม 1 MB, อัปโหลด 3–12 MB)
+- รูปที่อัปโหลดถูก decode และ encode ใหม่ ตั้งชื่อไฟล์แบบสุ่ม ปิดการแสดงรายการไฟล์ในโฟลเดอร์ static
+- Headers: CSP (`frame-ancestors 'none'`, `object-src 'none'`, `form-action 'self'`), HSTS, `nosniff`, `X-Frame-Options`, COOP, Permissions-Policy
+- คอนเทนเนอร์ distroless รันด้วยผู้ใช้ non-root, filesystem read-only, drop capabilities ทั้งหมด, แอปเปิดพอร์ตแค่ loopback และฐานข้อมูลไม่เปิดพอร์ตออกภายนอก
+- IP ของผู้ใช้จริงมาจาก `X-Real-IP` ที่ nginx ตั้งหลังแปลง `CF-Connecting-IP` ของ Cloudflare แล้ว จึงจำกัด login ต่อคนได้ถูกต้อง
 
 <a id="http-routes"></a>
 
 ## เส้นทาง HTTP
 
-เส้นทางเหล่านี้ตอบกลับเป็น HTML หรือข้อความธรรมดา ไม่ใช่ JSON API โดยกำหนดไว้ใน [cmd/web/routes.go](./cmd/web/routes.go)
+| เมธอด | เส้นทาง | สิทธิ์ | คำอธิบาย |
+|-------|---------|--------|----------|
+| GET | `/` | ทุกคน | หน้าแรก |
+| GET | `/healthz` | ทุกคน | health check (ตรวจการเชื่อมต่อฐานข้อมูล) |
+| GET | `/movies/`, `/movies/{id}` | ทุกคน | รายการและรายละเอียดภาพยนตร์ |
+| GET | `/movies/search?q=`, `/actors/search?q=` | ทุกคน | ค้นหา (JSON) |
+| GET | `/actors/`, `/actors/{id}` | ทุกคน | รายการและรายละเอียดนักแสดง (`/persons/*` redirect มาที่นี่) |
+| GET/POST | `/user/signup`, `/user/login` | ทุกคน | สมัครสมาชิก / เข้าสู่ระบบ (POST ถูกจำกัดอัตรา) |
+| POST | `/user/logout` | สมาชิก | ออกจากระบบ |
+| GET | `/profile`, POST `/profile/avatar` | สมาชิก | โปรไฟล์และรูปโปรไฟล์ |
+| GET/POST | `/movies/{id}/review`, `/reviews/{id}/edit` | สมาชิก | เขียน/แก้ไขรีวิวของตัวเอง |
+| GET/POST | `/movies/add`, `/movies/{id}/edit`, `/movies/{id}/delete`, `/movies/import` | ผู้ดูแล | จัดการภาพยนตร์ |
+| GET/POST | `/actors/add`, `/actors/{id}/edit`, `/actors/{id}/delete` | ผู้ดูแล | จัดการนักแสดง |
+| GET | `/static/*` | ทุกคน | ไฟล์ static และไฟล์อัปโหลด |
 
-| เมธอด | เส้นทาง | พฤติกรรมปัจจุบัน |
-|-------|---------|-----------------|
-| GET | `/` | สั่งให้เกิด panic และ middleware ตอบกลับ 500 |
-| GET | `/profile` | แสดงข้อความตัวอย่าง |
-| GET | `/movies/` | แสดงภาพยนตร์ที่เพิ่มล่าสุด 10 เรื่อง |
-| GET | `/movies/{movieID}` | แสดงรายละเอียดภาพยนตร์และรีวิวแบบแบ่งหน้า |
-| GET | `/movies/add` | แสดงฟอร์มเพิ่มภาพยนตร์ |
-| POST | `/movies/add` | ตรวจสอบและบันทึกภาพยนตร์ ตั้งข้อความแจ้งผล และเปลี่ยนเส้นทางด้วยสถานะ 303 |
-| GET | `/movies/{movieID}/review` | แสดงข้อความตัวอย่าง ตรวจสอบเพียงว่า ID เป็นจำนวนเต็มบวก |
-| POST | `/movies/{movieID}/review` | แสดงข้อความตัวอย่าง ยังไม่บันทึกรีวิว |
-| GET | `/persons/` | ตอบกลับ 404 เพราะเส้นทางไม่มีพารามิเตอร์ ID ให้ handler อ่าน |
-| GET | `/user/signup` | แสดงข้อความตัวอย่างสำหรับหน้าสมัครสมาชิก |
-| POST | `/user/signup` | แสดงข้อความตัวอย่าง ยังไม่สร้างบัญชี |
-| GET | `/user/login` | แสดงข้อความตัวอย่างสำหรับหน้าเข้าสู่ระบบ |
-| POST | `/user/login` | แสดงข้อความตัวอย่าง ยังไม่ยืนยันตัวตน |
-| POST | `/user/logout` | แสดงข้อความตัวอย่าง ยังไม่ดำเนินการออกจากระบบ |
-| GET | `/static/` | ให้บริการไฟล์ภายใน `ui/static/` |
+<a id="database"></a>
 
-เส้นทางเดิม `POST /movies/create` ไม่มีการลงทะเบียนแล้ว ส่วน `/movies/` ลงทะเบียนเป็นรูปแบบที่ครอบคลุมเส้นทางย่อย ดังนั้นคำขอ GET ภายใต้เส้นทางนี้ที่ไม่ตรงกับเส้นทางอื่นอาจถูกส่งไปยัง handler แสดงรายการภาพยนตร์ได้
+## ฐานข้อมูล
 
-พารามิเตอร์ใน URL ของหน้ารายละเอียดภาพยนตร์:
+สคีมาอยู่ใน [`internal/models/migrations`](./internal/models/migrations) และถูกฝังในไบนารี รันด้วย `-migrate` (หรือ `DB_MIGRATE=true`) ระบบบันทึกเวอร์ชันที่รันแล้วในตาราง `schema_migrations` และใช้ advisory lock (`GET_LOCK`) ป้องกันการรันซ้อน
 
-- `page`: เลขหน้าที่เป็นจำนวนเต็มบวก ค่าเริ่มต้นคือ `1` แสดงรีวิวหน้าละ 10 รายการ หากรูปแบบไม่ถูกต้องหรือเกินจำนวนหน้าจะตอบกลับ 404 แต่อนุญาตให้เปิดหน้า 1 ได้เมื่อยังไม่มีรีวิว
-- `sort=popular`: เรียงตามจำนวนไลก์จากมากไปน้อย แล้วเรียงตามเวลาสร้างและ ID จากมากไปน้อยตามลำดับ ค่าอื่นจะเรียงตามเวลาสร้างและ ID จากมากไปน้อย
+| ไฟล์ | หน้าที่ |
+|------|---------|
+| `0001_initial_schema.sql` | สร้างตารางทั้งหมด (`CREATE TABLE IF NOT EXISTS`) |
+| `0002_backfill_columns.sql` | อัปเกรดฐานข้อมูลที่สร้างตาม README เวอร์ชันเก่า: เติมคอลัมน์ที่ขาด ผ่อนคอลัมน์ `NOT NULL` ที่ทำให้นำเข้า TMDB ไม่ได้ เปลี่ยน rating เป็นทศนิยม และสร้าง unique key ของ `tmdb_id` |
 
-ตัวอย่าง `/movies/1?page=2&sort=popular` จะแสดงรีวิวหน้าที่ 2 ของภาพยนตร์ ID 1 โดยเรียงตามความนิยม หากมีรีวิวมากพอสำหรับหน้านั้น
+เพิ่ม migration ใหม่ได้โดยสร้างไฟล์ `000N_description.sql` ไฟล์จะรันตามลำดับชื่อ ใช้ `ADD COLUMN IF NOT EXISTS` และ `CREATE [UNIQUE] INDEX IF NOT EXISTS` ได้ ตัว migrator จะจำลองให้ทำงานบน MySQL 8 ด้วย (ตามปกติรองรับเฉพาะ MariaDB)
 
-ฟอร์มเพิ่มภาพยนตร์รับค่า `title`, `description`, `release_date` และ `poster_image` โดยต้องระบุชื่อเรื่องไม่เกิน 100 ตัวอักษร และวันที่เข้าฉายในรูปแบบ `YYYY-MM-DD` หากไม่ผ่านการตรวจสอบช่องข้อมูลจะตอบกลับ 422 ส่วนข้อผิดพลาดในการแปลงข้อมูลฟอร์มหรือวันที่จะตอบกลับ 400 คำอธิบายและรูปโปสเตอร์สามารถเว้นว่างได้
+เวลาทั้งหมดเก็บเป็น UTC เพราะทุก connection ตั้ง `time_zone='+00:00'` แม้เซิร์ฟเวอร์ฐานข้อมูลจะตั้งเขตเวลาอื่น (เช่น +07)
 
-<a id="database-models"></a>
-
-## โมเดลฐานข้อมูล
-
-| โมเดล | เมธอด | การเชื่อมต่อกับหน้าเว็บ |
-|-------|-------|-----------------------|
-| `MovieModel` | `Insert`, `Get`, `Latest`, `TopPicks` | ใช้ในหน้ารายการ รายละเอียด และการเพิ่มภาพยนตร์ ส่วน `TopPicks` ยังไม่ได้ใช้งาน |
-| `ReviewModel` | `ListByMovieID`, `CountByMovieID`, `GetRandom`, `Insert`, `Delete`, `Update` | หน้ารายละเอียดภาพยนตร์ใช้เมธอดอ่านรายการและนับรีวิว เมธอดอื่นยังไม่เชื่อมต่อกับเส้นทาง |
-| `PersonModel` | `Insert`, `Get` | ยังไม่ได้สร้างอินสแตนซ์ในแอปพลิเคชันหรือเชื่อมต่อกับหน้าที่ใช้งานได้ |
-| `MoviePersonModel` | `Insert`, `GetCastMembers`, `GetFilmography` | ยังไม่ได้สร้างอินสแตนซ์ในแอปพลิเคชันหรือเชื่อมต่อกับหน้าเว็บ |
-
-`TopPicks` เลือกภาพยนตร์ที่มี `avg_rating > 4.00` สูงสุด 5 เรื่อง เรียงตามคะแนนจากมากไปน้อย ส่วน `GetRandom` สุ่มรีวิว 1 รายการที่มี `rating > 3` จำนวนไลก์ของรีวิวคำนวณด้วย SQL JOIN แต่ยังไม่มีเส้นทางสำหรับกดหรือยกเลิกไลก์
-
-<a id="database-diagrams"></a>
-
-## แผนภาพฐานข้อมูล
-
-ไฟล์อ้างอิงการออกแบบอยู่ใน `docs/` เมื่อตั้งค่าฐานข้อมูลควรตรวจสอบคำสั่ง SQL ในโมเดลปัจจุบันและข้อกำหนดของระบบเซสชันร่วมด้วย แผนภาพเหล่านี้ไม่ได้ใช้สร้างหรือปรับโครงสร้างฐานข้อมูลโดยอัตโนมัติ
-
-### โครงสร้างฐานข้อมูลระดับกายภาพ
+ไฟล์อ้างอิงการออกแบบอยู่ใน `docs/` (อาจไม่ตรงกับสคีมาปัจจุบันทุกคอลัมน์ ให้ยึด migration เป็นหลัก)
 
 ![แผนภาพ EER](./docs/EER%20Diagram.png)
-
-### โครงสร้างฐานข้อมูลระดับแนวคิด
 
 ![แผนภาพ ER ระดับแนวคิด](./docs/conceptual-ER.jpg)
 
@@ -295,19 +251,12 @@ go run ./cmd/web -addr ":8080" -dsn "movie_app:change-this-password@tcp(localhos
 
 ## ข้อจำกัดปัจจุบัน
 
-- Handler ของหน้าแรกมีคำสั่งให้เกิด panic ไฟล์ `home.tmpl` และ `review.tmpl` ยังว่าง และเทมเพลตหลักยังแสดงชื่อ "Snippetbox" จากบทเรียน
-- หน้าสมัครสมาชิก เข้าสู่ระบบ ออกจากระบบ โปรไฟล์ และเส้นทาง GET/POST ของรีวิวยังเป็นข้อความตัวอย่าง แม้มีระบบจัดเก็บเซสชันแล้ว แต่ยังไม่มีการยืนยันตัวตนหรือตรวจสอบสิทธิ์
-- การเพิ่มภาพยนตร์ยังไม่บังคับให้เข้าสู่ระบบ และยังไม่มีการป้องกัน CSRF
-- Handler `movieReviews` ยังไม่ได้ลงทะเบียนเส้นทาง ปัจจุบันใช้ `movieDetail` แสดงรีวิว
-- ลิงก์เปลี่ยนหน้าไม่ได้ส่งพารามิเตอร์ `sort` ต่อไปด้วย เมื่อกดเปลี่ยนหน้าจึงกลับไปใช้การเรียงลำดับเริ่มต้น และเมื่อไม่มีรีวิวจะแสดง "Page 1 of 0"
-- ค่าโปสเตอร์แสดงเป็นข้อความ ยังไม่ได้แสดงเป็นรูปภาพ
-- `/persons/` ไม่ได้รับค่า `id` ที่ `personDetail` ต้องใช้ และ `PersonModel.Get` อ่านคอลัมน์ `birthDate` กับ `profileImage` ขณะที่ `Insert` ใช้ `birth_date` กับ `profile_image`
-- เมธอดเพิ่ม แก้ไข และลบรีวิวยังไม่ปรับค่า `movies.review_count` หรือ `movies.avg_rating` แอปพลิเคชันจึงยังไม่คำนวณค่าสรุปเหล่านี้ใหม่โดยอัตโนมัติ
-- ข้อผิดพลาดตอบกลับเป็นข้อความ HTTP มาตรฐาน ยังไม่มีหน้าแสดงข้อผิดพลาดที่ออกแบบไว้เฉพาะ
-- ยังไม่มีไฟล์ทดสอบอัตโนมัติ ไฟล์ migration หรือสคริปต์เพิ่มข้อมูลเริ่มต้น
+- ยังไม่มีเส้นทางสำหรับกดไลก์รีวิว (ตาราง `review_likes` และการนับไลก์มีแล้ว) และยังลบรีวิวผ่านหน้าเว็บไม่ได้
+- ตัวจำกัดอัตรา login เก็บในหน่วยความจำ ถ้ารันหลาย replica จะนับแยกกันในแต่ละ instance
+- ไฟล์อัปโหลดเก็บใน volume ของเซิร์ฟเวอร์เดียว ถ้าจะขยายหลายเครื่องควรย้ายไป object storage
+- ข้อผิดพลาดตอบกลับเป็นข้อความ HTTP มาตรฐาน ยังไม่มีหน้า error ที่ออกแบบเฉพาะ
+- Test อัตโนมัติส่วนใหญ่ยังเป็น unit test ของ middleware/validator/migration การทดสอบกับฐานข้อมูลจริงอยู่ใน smoke test ของ CI ยังไม่มี integration test ของ model แยกเฉพาะ
 
 ## ผู้พัฒนา
 
 [Zetshin](https://github.com/Zetshin)
-
-โปรเจกต์ส่วนตัวสำหรับฝึกพัฒนาเว็บด้วย Go และออกแบบฐานข้อมูลเชิงสัมพันธ์

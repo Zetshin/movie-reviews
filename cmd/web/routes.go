@@ -1,8 +1,10 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/justinas/alice"
 )
@@ -10,13 +12,15 @@ import (
 func (app *application) routes() http.Handler {
 
 	mux := http.NewServeMux()
-	fileServer := http.FileServer(http.Dir("./ui/static/"))
+	fileServer := http.FileServer(neuteredFileSystem{http.Dir("./ui/static/")})
 	mux.Handle("GET /static/", http.StripPrefix("/static", fileServer))
+	mux.HandleFunc("GET /healthz", app.healthz)
 
-	dynamic := alice.New(app.sessionManager.LoadAndSave, preventCSRF)
-	// โหลด session → ตรวจล็อกอิน
-
-	// เพิ่มการตรวจแอดมิน
+	dynamic := alice.New(app.sessionManager.LoadAndSave, app.preventCSRF)
+	// Plain forms are capped at 1 MB; upload routes set their own larger limit.
+	forms := alice.New(limitFormBody).Extend(dynamic)
+	// Login and signup run bcrypt, so throttle them per client IP.
+	auth := alice.New(app.rateLimit(app.authLimiter)).Extend(forms)
 
 	mux.Handle("GET /{$}", dynamic.ThenFunc(app.home))
 	mux.Handle("GET /movies/search", dynamic.ThenFunc(app.movieSearch))
@@ -28,21 +32,22 @@ func (app *application) routes() http.Handler {
 	mux.Handle("GET /persons/{$}", dynamic.ThenFunc(redirectLegacyPersonRoute))
 	mux.Handle("GET /persons/search", dynamic.ThenFunc(redirectLegacyPersonRoute))
 	mux.Handle("GET /persons/{id}", dynamic.ThenFunc(redirectLegacyPersonRoute))
-	standard := alice.New(app.recoverPanic, app.logRequest, commonHeaders)
+	standard := alice.New(app.recoverPanic, app.logRequest, app.commonHeaders)
 
 	mux.Handle("GET /user/signup", dynamic.ThenFunc(app.userSignup))
-	mux.Handle("POST /user/signup", dynamic.ThenFunc(app.userSignupPost))
+	mux.Handle("POST /user/signup", auth.ThenFunc(app.userSignupPost))
 	mux.Handle("GET /user/login", dynamic.ThenFunc(app.userLogin))
-	mux.Handle("POST /user/login", dynamic.ThenFunc(app.userLoginPost))
+	mux.Handle("POST /user/login", auth.ThenFunc(app.userLoginPost))
 
 	protected := dynamic.Append(app.requireAuthenticated)
-	mux.Handle("POST /user/logout", protected.ThenFunc(app.userLogoutPost))
+	protectedForms := forms.Append(app.requireAuthenticated)
+	mux.Handle("POST /user/logout", protectedForms.ThenFunc(app.userLogoutPost))
 	mux.Handle("GET /profile", protected.ThenFunc(app.profile))
 	mux.Handle("POST /profile/avatar", alice.New(limitAvatarUpload).Extend(protected).ThenFunc(app.profileAvatarPost))
 	mux.Handle("GET /reviews/{reviewID}/edit", protected.ThenFunc(app.reviewEdit))
-	mux.Handle("POST /reviews/{reviewID}/edit", protected.ThenFunc(app.reviewEditPost))
+	mux.Handle("POST /reviews/{reviewID}/edit", protectedForms.ThenFunc(app.reviewEditPost))
 	mux.Handle("GET /movies/{movieID}/review", protected.ThenFunc(app.movieReview))
-	mux.Handle("POST /movies/{movieID}/review", protected.ThenFunc(app.movieReviewPost)) //ส่งรีวิว
+	mux.Handle("POST /movies/{movieID}/review", protectedForms.ThenFunc(app.movieReviewPost)) //ส่งรีวิว
 
 	adminOnly := alice.New(limitMovieUpload).Extend(protected.Append(app.requireAdmin))
 	mux.Handle("GET /actors/add", adminOnly.ThenFunc(app.personAdd))
@@ -67,6 +72,24 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /movies/add", adminOnly.ThenFunc(app.movieAddPost)) //ให้เพิ่มหนัง
 	return standard.Then(mux)
 
+}
+
+// healthz reports whether the process can serve traffic. It checks the
+// database because every page depends on it, but never reveals the error.
+func (app *application) healthz(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	if app.db != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+		if err := app.db.PingContext(ctx); err != nil {
+			app.logger.Error("health check: database unavailable", "error", err)
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("database unavailable\n"))
+			return
+		}
+	}
+	w.Write([]byte("ok\n"))
 }
 
 func redirectLegacyPersonRoute(w http.ResponseWriter, r *http.Request) {

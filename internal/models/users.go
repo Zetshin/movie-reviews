@@ -58,11 +58,10 @@ func (m *UserModel) Insert(name, email, password string) error {
 		// whether the error matches the type *mysql.MySQLError, and if it does,
 		// assign it to the mySQLError variable.
 		if mySQLError, ok := errors.AsType[*mysql.MySQLError](err); ok {
-			// We can then check whether or not the error relates to our
-			// users_uc_email key by checking if the error code equals 1062 and
-			// the contents of the error message string. If both are true, then
-			// we return an ErrDuplicateEmail error.
-			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "users.email") {
+			// Error 1062 is a duplicate key. Match any unique key on the email
+			// column: MySQL reports it as "users.email" or "users.users_uc_email"
+			// depending on how the index was named.
+			if mySQLError.Number == 1062 && strings.Contains(mySQLError.Message, "email") {
 				return ErrDuplicateEmail
 			}
 		}
@@ -84,6 +83,9 @@ func (m *UserModel) Authenticate(email, password string) (int, error) {
 	err := m.DB.QueryRow(stmt, email).Scan(&id, &hashedPassword)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			// Spend the same bcrypt time as a real check so response timing
+			// does not reveal which email addresses are registered.
+			bcrypt.CompareHashAndPassword(dummyPasswordHash, []byte(password))
 			return 0, ErrInvalidCredentials
 		} else {
 			return 0, err
@@ -103,9 +105,15 @@ func (m *UserModel) Authenticate(email, password string) (int, error) {
 	return id, nil
 }
 
-// We'll use the Exists method to check if a user exists with a specific ID.
+// dummyPasswordHash is a real bcrypt hash with the same cost as stored
+// passwords. It is used only to equalise login timing for unknown emails.
+var dummyPasswordHash, _ = bcrypt.GenerateFromPassword([]byte("timing-equaliser-not-a-password"), 12)
+
+// Exists reports whether a user with the given ID is still present.
 func (m *UserModel) Exists(id int) (bool, error) {
-	return false, nil
+	var exists bool
+	err := m.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, id).Scan(&exists)
+	return exists, err
 }
 
 func (m *UserModel) IsAdmin(id int) (bool, error) {

@@ -1,62 +1,58 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"net"
 	"net/http"
+	"strings"
+	"sync"
+	"time"
 
+	"github.com/Zetshin/movie-reviews/internal/models"
 	"github.com/justinas/nosurf"
 )
 
-func commonHeaders(next http.Handler) http.Handler {
+func (app *application) commonHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Note: This is split across multiple lines for readability. You don't
-		// need to do this in your own code.
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; img-src 'self' https: blob:; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
-		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
+			"default-src 'self'; img-src 'self' https: blob:; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com; "+
+				"object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'")
+		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
 		w.Header().Set("X-XSS-Protection", "0")
-		w.Header().Set("Server", "Go")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		w.Header().Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		if app.config.secureCookie {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
 		next.ServeHTTP(w, r)
 	})
-
 }
+
 func (app *application) logRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var (
-			ip     = r.RemoteAddr
-			proto  = r.Proto
-			method = r.Method
-			uri    = r.URL.RequestURI()
-		)
-
 		app.logger.Info("received request",
-			"ip", ip,
-			"proto", proto,
-			"method", method,
-			"uri", uri,
+			"ip", app.clientIP(r),
+			"proto", r.Proto,
+			"method", r.Method,
+			"uri", r.URL.RequestURI(),
 		)
-
 		next.ServeHTTP(w, r)
 	})
 }
+
 func (app *application) recoverPanic(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Create a deferred function (which will always be run in the event
-		// of a panic).
 		defer func() {
-			// Use the built-in recover() function to check if a panic occurred.
-			// If a panic did happen, recover() will return the panic value. If
-			// a panic didn't happen, it will return nil.
-			pv := recover()
-
-			// If a panic did happen...
-			if pv != nil {
-				// Set a "Connection: close" header on the response.
+			if pv := recover(); pv != nil {
+				// http.ErrAbortHandler is used to abort a response on purpose.
+				if pv == http.ErrAbortHandler {
+					panic(pv)
+				}
 				w.Header().Set("Connection", "close")
-				// Call the app.serverError helper method to return a 500
-				// Internal Server response.
 				app.serverError(w, r, fmt.Errorf("%v", pv))
 			}
 		}()
@@ -81,6 +77,12 @@ func (app *application) requireAdmin(next http.Handler) http.Handler {
 
 		isAdmin, err := app.users.IsAdmin(id)
 		if err != nil {
+			// A session can outlive its user (for example after the account is
+			// deleted). Treat that as "not an admin" instead of a server error.
+			if errors.Is(err, models.ErrNoRecord) {
+				app.clientError(w, http.StatusForbidden)
+				return
+			}
 			app.serverError(w, r, err)
 			return
 		}
@@ -94,14 +96,53 @@ func (app *application) requireAdmin(next http.Handler) http.Handler {
 	})
 }
 
-func preventCSRF(next http.Handler) http.Handler {
+func (app *application) preventCSRF(next http.Handler) http.Handler {
 	csrfHandler := nosurf.New(next)
 	csrfHandler.SetBaseCookie(http.Cookie{
 		HttpOnly: true,
 		Path:     "/",
-		Secure:   true,
+		Secure:   app.config.secureCookie,
+		SameSite: http.SameSiteLaxMode,
 	})
+	// nosurf assumes HTTPS by default and then requires a Referer on every
+	// POST. When TLS ends at a reverse proxy we rely on X-Forwarded-Proto,
+	// which is only trusted when -trust-proxy is set.
+	csrfHandler.SetIsTLSFunc(app.isHTTPS)
 	return csrfHandler
+}
+
+// isHTTPS reports whether the client reached us over HTTPS, either directly
+// or through a trusted TLS-terminating reverse proxy.
+func (app *application) isHTTPS(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	return app.config.trustProxy && strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https")
+}
+
+// clientIP returns the address used for logging and rate limiting. Proxy
+// headers are ignored unless the operator has opted in with -trust-proxy,
+// otherwise any client could spoof its address.
+func (app *application) clientIP(r *http.Request) string {
+	if app.config.trustProxy {
+		// nginx sets X-Real-IP to the client address it resolved (after its
+		// own real_ip handling, e.g. Cloudflare's CF-Connecting-IP).
+		if ip := strings.TrimSpace(r.Header.Get("X-Real-IP")); net.ParseIP(ip) != nil {
+			return ip
+		}
+		if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+			// The proxy appends the address it saw as the last entry.
+			parts := strings.Split(forwarded, ",")
+			if ip := strings.TrimSpace(parts[len(parts)-1]); ip != "" {
+				return ip
+			}
+		}
+	}
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return r.RemoteAddr
+	}
+	return host
 }
 
 // Apply this before CSRF middleware can parse an uploaded movie image.
@@ -118,4 +159,96 @@ func limitAvatarUpload(next http.Handler) http.Handler {
 		r.Body = http.MaxBytesReader(w, r.Body, 3<<20)
 		next.ServeHTTP(w, r)
 	})
+}
+
+// limitFormBody caps ordinary (non-upload) form submissions at 1 MB.
+func limitFormBody(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+		next.ServeHTTP(w, r)
+	})
+}
+
+// rateLimiter is a small fixed-window limiter keyed by client IP. It protects
+// login and signup from password guessing and bcrypt-driven CPU exhaustion.
+type rateLimiter struct {
+	mu        sync.Mutex
+	limit     int
+	window    time.Duration
+	clients   map[string]*rateWindow
+	now       func() time.Time
+	nextSweep time.Time
+}
+
+type rateWindow struct {
+	count int
+	reset time.Time
+}
+
+func newRateLimiter(limit int, window time.Duration) *rateLimiter {
+	return &rateLimiter{limit: limit, window: window, clients: make(map[string]*rateWindow), now: time.Now}
+}
+
+// allow records one attempt for key and reports whether it is permitted.
+func (l *rateLimiter) allow(key string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	now := l.now()
+	// Drop expired entries once per window so the map cannot grow without
+	// bound, without scanning it on every request.
+	if now.After(l.nextSweep) {
+		for k, entry := range l.clients {
+			if now.After(entry.reset) {
+				delete(l.clients, k)
+			}
+		}
+		l.nextSweep = now.Add(l.window)
+	}
+	entry, ok := l.clients[key]
+	if !ok || now.After(entry.reset) {
+		l.clients[key] = &rateWindow{count: 1, reset: now.Add(l.window)}
+		return true
+	}
+	if entry.count >= l.limit {
+		return false
+	}
+	entry.count++
+	return true
+}
+
+func (app *application) rateLimit(limiter *rateLimiter) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.Method == http.MethodPost && !limiter.allow(app.clientIP(r)) {
+				w.Header().Set("Retry-After", fmt.Sprintf("%d", int(limiter.window.Seconds())))
+				app.clientError(w, http.StatusTooManyRequests)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// neuteredFileSystem serves files but never directory listings, so upload
+// folders cannot be enumerated.
+type neuteredFileSystem struct {
+	fs http.FileSystem
+}
+
+func (nfs neuteredFileSystem) Open(path string) (http.File, error) {
+	f, err := nfs.fs.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	s, err := f.Stat()
+	if err != nil {
+		f.Close()
+		return nil, err
+	}
+	if s.IsDir() {
+		f.Close()
+		// http.FileServer maps fs.ErrNotExist to a plain 404.
+		return nil, fs.ErrNotExist
+	}
+	return f, nil
 }

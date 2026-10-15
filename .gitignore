@@ -1,6 +1,26 @@
-﻿tls/
-/output/
+﻿# Local secrets and certificates
+tls/
 .env
+.env.*
+!.env.example
+
+# Build output and caches
+/output/
+/bin/
+/tmp/
+*.exe
+*.test
+*.out
+coverage.*
+
+# User uploads (persisted in a Docker volume in production)
 ui/static/uploads/avatars/
 ui/static/uploads/movies/
 ui/static/uploads/persons/
+
+# Editors and OS files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db

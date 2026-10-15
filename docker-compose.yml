@@ -1,0 +1,63 @@
+# Local / single-host stack: app + MySQL.
+#   cp .env.example .env   # then fill in the secrets
+#   docker compose up -d --build
+# The app is published on http://localhost:4000 (HTTP, for local use).
+# For production behind HTTPS use docker-compose.prod.yml as an overlay.
+
+name: movie-reviews
+
+services:
+  app:
+    build:
+      context: .
+      args:
+        VERSION: ${APP_VERSION:-dev}
+    image: ${APP_IMAGE:-movie-reviews:local}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      TMDB_API_KEY: ${TMDB_API_KEY:?set TMDB_API_KEY in .env}
+      DB_DSN: ${MYSQL_USER:-movie_app}:${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}@tcp(db:3306)/${MYSQL_DATABASE:-movies}?parseTime=true&charset=utf8mb4&collation=utf8mb4_unicode_ci
+      DB_MIGRATE: "true"
+      TLS_ENABLED: "false"
+      # Local HTTP needs non-Secure cookies; the prod overlay turns this on.
+      SECURE_COOKIE: ${SECURE_COOKIE:-false}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    ports:
+      - "${APP_PORT:-4000}:4000"
+    volumes:
+      - uploads:/app/ui/static/uploads
+    read_only: true
+    tmpfs:
+      - /tmp
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+
+  db:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-movies}
+      MYSQL_USER: ${MYSQL_USER:-movie_app}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:?set MYSQL_PASSWORD in .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?set MYSQL_ROOT_PASSWORD in .env}
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+    volumes:
+      - db-data:/var/lib/mysql
+    # Not published: only the app container can reach MySQL.
+
+volumes:
+  db-data:
+  uploads:
