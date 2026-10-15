@@ -25,6 +25,13 @@ services:
       # Only Hestia's nginx can reach 127.0.0.1:4010, so its headers are trusted.
       TRUST_PROXY: "true"
       TZ: ${TZ:-Asia/Bangkok}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://movieclubth.com}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-true}
     # Loopback only: the public entry point is Hestia's nginx.
     ports:
       - "127.0.0.1:${APP_PORT:-4010}:4000"

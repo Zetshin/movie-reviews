@@ -1,15 +1,29 @@
 package main
 
 import (
+	"bytes"
 	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestLogRequestRedactsPasswordResetToken(t *testing.T) {
+	var output bytes.Buffer
+	app := &application{config: config{}, logger: slog.New(slog.NewTextHandler(&output, nil))}
+	handler := app.logRequest(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	req := httptest.NewRequest(http.MethodGet, "/user/reset-password?token=super-secret-token", nil)
+	handler.ServeHTTP(httptest.NewRecorder(), req)
+	logLine := output.String()
+	if strings.Contains(logLine, "super-secret-token") || !strings.Contains(logLine, "[redacted]") {
+		t.Fatalf("reset token was not redacted: %s", logLine)
+	}
+}
 
 func newTestApp(cfg config) *application {
 	return &application{config: cfg, logger: slog.New(slog.NewTextHandler(io.Discard, nil))}

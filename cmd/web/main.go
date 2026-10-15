@@ -35,14 +35,21 @@ var version = "dev"
 // config holds runtime settings. Every flag can also be set with an
 // environment variable so the same binary works locally and in Docker.
 type config struct {
-	addr         string
-	dsn          string
-	tls          bool
-	tlsCert      string
-	tlsKey       string
-	secureCookie bool
-	trustProxy   bool
-	migrate      bool
+	addr           string
+	dsn            string
+	tls            bool
+	tlsCert        string
+	tlsKey         string
+	secureCookie   bool
+	trustProxy     bool
+	migrate        bool
+	publicBaseURL  string
+	smtpHost       string
+	smtpPort       string
+	smtpUsername   string
+	smtpPassword   string
+	mailFrom       string
+	smtpRequireTLS bool
 }
 
 type application struct {
@@ -60,6 +67,7 @@ type application struct {
 	tmdb           *tmdb.Client
 	heroCache      heroCache
 	authLimiter    *rateLimiter
+	passwordMailer passwordResetMailer
 }
 
 func envString(key, fallback string) string {
@@ -94,6 +102,13 @@ func main() {
 	flag.BoolVar(&cfg.secureCookie, "secure-cookie", envBool("SECURE_COOKIE", true), "Mark cookies Secure and send HSTS; disable only for local HTTP testing (env SECURE_COOKIE)")
 	flag.BoolVar(&cfg.trustProxy, "trust-proxy", envBool("TRUST_PROXY", false), "Trust X-Forwarded-For/Proto from a reverse proxy (env TRUST_PROXY)")
 	flag.BoolVar(&cfg.migrate, "migrate", envBool("DB_MIGRATE", false), "Apply database migrations before starting (env DB_MIGRATE)")
+	flag.StringVar(&cfg.publicBaseURL, "public-base-url", envString("PUBLIC_BASE_URL", "http://localhost:4000"), "Public site URL used in email links")
+	flag.StringVar(&cfg.smtpHost, "smtp-host", envString("SMTP_HOST", ""), "SMTP server hostname")
+	flag.StringVar(&cfg.smtpPort, "smtp-port", envString("SMTP_PORT", "587"), "SMTP server port")
+	flag.StringVar(&cfg.smtpUsername, "smtp-username", envString("SMTP_USERNAME", ""), "SMTP username")
+	flag.StringVar(&cfg.smtpPassword, "smtp-password", envString("SMTP_PASSWORD", ""), "SMTP password")
+	flag.StringVar(&cfg.mailFrom, "mail-from", envString("MAIL_FROM", ""), "Password reset sender address")
+	flag.BoolVar(&cfg.smtpRequireTLS, "smtp-require-tls", envBool("SMTP_REQUIRE_TLS", true), "Require STARTTLS for password reset email")
 	importTMDB := flag.Int("import-tmdb", 0, "Import 1-20 now-playing movies from TMDB, then exit without starting the server")
 	importPeople := flag.Bool("import-person-details", false, "Fill details for imported TMDB people, then exit without starting the server")
 	importTrending := flag.Int("import-trending-people", 0, "Import 1-20 weekly trending people for Home, then exit")
@@ -101,6 +116,10 @@ func main() {
 	syncMetadata := flag.Bool("sync-tmdb-metadata", false, "Refresh cast order and character names for imported movies, then exit")
 	healthcheck := flag.Bool("healthcheck", false, "Probe the local /healthz endpoint and exit 0 when healthy (for Docker HEALTHCHECK)")
 	flag.Parse()
+	if err := validatePasswordResetConfig(cfg); err != nil {
+		logger.Error("invalid password reset configuration", "error", err)
+		os.Exit(1)
+	}
 
 	if *healthcheck {
 		os.Exit(runHealthcheck(cfg))
@@ -175,6 +194,10 @@ func main() {
 		moviePersons:   &models.MoviePersonModel{DB: db},
 		tmdb:           tmdb.NewClient(apiKey),
 		authLimiter:    newRateLimiter(10, time.Minute),
+		passwordMailer: newPasswordResetMailer(cfg),
+	}
+	if app.passwordMailer == nil {
+		logger.Warn("password reset email is disabled; set SMTP_HOST and MAIL_FROM")
 	}
 
 	if *syncMetadata {

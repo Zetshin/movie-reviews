@@ -34,11 +34,15 @@ func (app *application) commonHeaders(next http.Handler) http.Handler {
 
 func (app *application) logRequest(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		uri := r.URL.RequestURI()
+		if r.URL.Path == "/user/reset-password" && r.URL.Query().Has("token") {
+			uri = "/user/reset-password?token=[redacted]"
+		}
 		app.logger.Info("received request",
 			"ip", app.clientIP(r),
 			"proto", r.Proto,
 			"method", r.Method,
-			"uri", r.URL.RequestURI(),
+			"uri", uri,
 		)
 		next.ServeHTTP(w, r)
 	})

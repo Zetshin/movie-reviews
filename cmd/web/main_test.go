@@ -59,3 +59,27 @@ func TestEnvHelpers(t *testing.T) {
 		t.Error("envString")
 	}
 }
+
+func TestValidatePasswordResetConfig(t *testing.T) {
+	valid := config{publicBaseURL: "https://movieclubth.com", secureCookie: true, smtpHost: "smtp.example.com", smtpPort: "587", smtpUsername: "user", smtpPassword: "secret", mailFrom: "no-reply@movieclubth.com", smtpRequireTLS: true}
+	if err := validatePasswordResetConfig(valid); err != nil {
+		t.Fatalf("valid config rejected: %v", err)
+	}
+	for name, mutate := range map[string]func(*config){
+		"partial smtp":              func(c *config) { c.mailFrom = "" },
+		"bad port":                  func(c *config) { c.smtpPort = "70000" },
+		"http production link":      func(c *config) { c.publicBaseURL = "http://movieclubth.com" },
+		"password without username": func(c *config) { c.smtpUsername = "" },
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := valid
+			mutate(&cfg)
+			if err := validatePasswordResetConfig(cfg); err == nil {
+				t.Fatal("invalid config was accepted")
+			}
+		})
+	}
+	if err := validatePasswordResetConfig(config{}); err != nil {
+		t.Fatalf("disabled mail should be allowed: %v", err)
+	}
+}

@@ -25,6 +25,13 @@ services:
       # Local HTTP needs non-Secure cookies; the prod overlay turns this on.
       SECURE_COOKIE: ${SECURE_COOKIE:-false}
       TRUST_PROXY: ${TRUST_PROXY:-false}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      MAIL_FROM: ${MAIL_FROM:-}
+      SMTP_REQUIRE_TLS: ${SMTP_REQUIRE_TLS:-true}
     ports:
       - "${APP_PORT:-4000}:4000"
     volumes:

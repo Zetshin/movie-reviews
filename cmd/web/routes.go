@@ -38,6 +38,10 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /user/signup", auth.ThenFunc(app.userSignupPost))
 	mux.Handle("GET /user/login", dynamic.ThenFunc(app.userLogin))
 	mux.Handle("POST /user/login", auth.ThenFunc(app.userLoginPost))
+	mux.Handle("GET /user/forgot-password", dynamic.ThenFunc(app.forgotPassword))
+	mux.Handle("POST /user/forgot-password", auth.ThenFunc(app.forgotPasswordPost))
+	mux.Handle("GET /user/reset-password", dynamic.ThenFunc(app.resetPassword))
+	mux.Handle("POST /user/reset-password", auth.ThenFunc(app.resetPasswordPost))
 
 	protected := dynamic.Append(app.requireAuthenticated)
 	protectedForms := forms.Append(app.requireAuthenticated)
@@ -48,6 +52,7 @@ func (app *application) routes() http.Handler {
 	mux.Handle("POST /reviews/{reviewID}/edit", protectedForms.ThenFunc(app.reviewEditPost))
 	mux.Handle("GET /movies/{movieID}/review", protected.ThenFunc(app.movieReview))
 	mux.Handle("POST /movies/{movieID}/review", protectedForms.ThenFunc(app.movieReviewPost)) //ส่งรีวิว
+	mux.Handle("POST /reviews/{reviewID}/like", protectedForms.ThenFunc(app.reviewLikePost))
 
 	adminOnly := alice.New(limitMovieUpload).Extend(protected.Append(app.requireAdmin))
 	mux.Handle("GET /actors/add", adminOnly.ThenFunc(app.personAdd))

@@ -35,6 +35,7 @@ type templateData struct {
 	User            models.User
 	UserReviews     []models.UserReview
 	EditingReviewID int
+	UserReviewID    int
 	AvatarError     string
 	CurrentYear     int
 	Movie           models.Movie

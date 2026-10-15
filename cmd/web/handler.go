@@ -220,7 +220,11 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	offset := (page - 1) * pageSize
-	reviews, err := app.reviews.ListByMovieID(movieID, sort, pageSize, offset)
+	viewerID := 0
+	if app.isAuthenticated(r) {
+		viewerID = app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	}
+	reviews, err := app.reviews.ListByMovieID(movieID, viewerID, sort, pageSize, offset)
 	if err != nil {
 		app.serverError(w, r, err)
 		return
@@ -229,6 +233,13 @@ func (app *application) movieDetail(w http.ResponseWriter, r *http.Request) {
 	data := app.newTemplateData(r)
 	data.Reviews = reviews
 	data.Movie = movie
+	if viewerID > 0 {
+		data.UserReviewID, err = app.reviews.IDByMovieAndUser(movieID, viewerID)
+		if err != nil && !errors.Is(err, models.ErrNoRecord) {
+			app.serverError(w, r, err)
+			return
+		}
+	}
 	data.Cast, err = app.moviePersons.GetCastMembers(movieID)
 	if err != nil {
 		app.serverError(w, r, err)
@@ -256,6 +267,14 @@ func (app *application) movieReview(w http.ResponseWriter, r *http.Request) {
 		} else {
 			app.serverError(w, r, err)
 		}
+		return
+	}
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	if reviewID, err := app.reviews.IDByMovieAndUser(movieID, userID); err == nil {
+		http.Redirect(w, r, fmt.Sprintf("/reviews/%d/edit", reviewID), http.StatusSeeOther)
+		return
+	} else if !errors.Is(err, models.ErrNoRecord) {
+		app.serverError(w, r, err)
 		return
 	}
 	data := app.newTemplateData(r)
@@ -312,7 +331,15 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 	}
 	_, err = app.reviews.Insert(movieID, userID, form.Rating, form.ReviewText, form.IsSpoiler)
 	if err != nil {
-		if errors.Is(err, models.ErrNoRecord) {
+		if errors.Is(err, models.ErrDuplicateReview) {
+			reviewID, lookupErr := app.reviews.IDByMovieAndUser(movieID, userID)
+			if lookupErr != nil {
+				app.serverError(w, r, lookupErr)
+				return
+			}
+			app.sessionManager.Put(r.Context(), "flash", "You already reviewed this movie. You can update your review here.")
+			http.Redirect(w, r, fmt.Sprintf("/reviews/%d/edit", reviewID), http.StatusSeeOther)
+		} else if errors.Is(err, models.ErrNoRecord) {
 			http.NotFound(w, r)
 		} else {
 			app.serverError(w, r, err)
@@ -321,6 +348,25 @@ func (app *application) movieReviewPost(w http.ResponseWriter, r *http.Request) 
 	}
 	app.sessionManager.Put(r.Context(), "flash", "Your review has been published.")
 	http.Redirect(w, r, fmt.Sprintf("/movies/%d#reviews", movieID), http.StatusSeeOther)
+}
+
+func (app *application) reviewLikePost(w http.ResponseWriter, r *http.Request) {
+	reviewID, err := strconv.Atoi(r.PathValue("reviewID"))
+	if err != nil || reviewID < 1 {
+		http.NotFound(w, r)
+		return
+	}
+	userID := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	movieID, _, err := app.reviews.ToggleLike(reviewID, userID)
+	if err != nil {
+		if errors.Is(err, models.ErrNoRecord) {
+			http.NotFound(w, r)
+		} else {
+			app.serverError(w, r, err)
+		}
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("/movies/%d#review-%d", movieID, reviewID), http.StatusSeeOther)
 }
 
 func (app *application) movieAdd(w http.ResponseWriter, r *http.Request) {
@@ -863,6 +909,12 @@ func (app *application) userLoginPost(w http.ResponseWriter, r *http.Request) {
 	// Add the ID of the current user to the session, so that they are now
 	// 'logged in'.
 	app.sessionManager.Put(r.Context(), "authenticatedUserID", id)
+	version, err := app.users.AuthVersion(id)
+	if err != nil {
+		app.serverError(w, r, err)
+		return
+	}
+	app.sessionManager.Put(r.Context(), "authenticatedAuthVersion", version)
 	// Redirect the user to the create snippet page.
 	http.Redirect(w, r, "/movies/", http.StatusSeeOther)
 }
@@ -878,6 +930,7 @@ func (app *application) userLogoutPost(w http.ResponseWriter, r *http.Request) {
 	// Remove the authenticatedUserID from the session data so that the user is
 	// 'logged out'.
 	app.sessionManager.Remove(r.Context(), "authenticatedUserID")
+	app.sessionManager.Remove(r.Context(), "authenticatedAuthVersion")
 	// Add a flash message to the session to confirm to the user that they've been
 	// logged out.
 	app.sessionManager.Put(r.Context(), "flash", "You've been logged out successfully!")

@@ -81,15 +81,15 @@ jobs:
       - name: Smoke test
         run: |
           set -e
-          for path in /healthz / /movies/ /actors/ /user/login /user/signup /static/css/site.css; do
+          for path in /healthz / /movies/ /actors/ /user/login /user/signup /user/forgot-password /static/css/site.css; do
             code=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:4000$path")
             echo "$path -> $code"
             [ "$code" = "200" ]
           done
           # Directory listings must stay disabled.
           [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:4000/static/css/)" = "404" ]
-          # Both migrations must be recorded.
-          docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -NBe "SELECT COUNT(*) FROM movies.schema_migrations"' | grep -qx 2
+          # All embedded migrations must be recorded.
+          docker compose exec -T db sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" -NBe "SELECT COUNT(*) FROM movies.schema_migrations"' | grep -qx 4
 
       - name: Logs on failure
         if: failure()

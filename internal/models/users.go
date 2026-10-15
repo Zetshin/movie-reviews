@@ -1,6 +1,7 @@
 package models
 
 import (
+	"crypto/sha256"
 	"database/sql"
 	"errors"  // New import
 	"strings" // New import
@@ -114,6 +115,80 @@ func (m *UserModel) Exists(id int) (bool, error) {
 	var exists bool
 	err := m.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)`, id).Scan(&exists)
 	return exists, err
+}
+
+// AuthVersion changes whenever a password is reset. Sessions keep the version
+// from login so resetting a password invalidates every older session.
+func (m *UserModel) AuthVersion(id int) (int, error) {
+	var version int
+	err := m.DB.QueryRow(`SELECT auth_version FROM users WHERE id = ?`, id).Scan(&version)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNoRecord
+	}
+	return version, err
+}
+
+// CreatePasswordReset replaces any earlier token for the email. Unknown
+// addresses deliberately return nil so callers cannot enumerate accounts.
+func (m *UserModel) CreatePasswordReset(email string, token string, expiresAt time.Time) (bool, error) {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback()
+	var userID int
+	err = tx.QueryRow(`SELECT id FROM users WHERE email = ? FOR UPDATE`, strings.TrimSpace(email)).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	if _, err = tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = ? OR expires_at <= UTC_TIMESTAMP(6)`, userID); err != nil {
+		return false, err
+	}
+	hash := sha256.Sum256([]byte(token))
+	if _, err = tx.Exec(`INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)`, hash[:], userID, expiresAt.UTC()); err != nil {
+		return false, err
+	}
+	return true, tx.Commit()
+}
+
+func (m *UserModel) PasswordResetTokenValid(token string) (bool, error) {
+	hash := sha256.Sum256([]byte(token))
+	var valid bool
+	err := m.DB.QueryRow(`SELECT EXISTS(SELECT 1 FROM password_reset_tokens WHERE token_hash = ? AND expires_at > UTC_TIMESTAMP(6))`, hash[:]).Scan(&valid)
+	return valid, err
+}
+
+// ResetPassword consumes the token atomically and increments auth_version to
+// revoke every session created before the reset.
+func (m *UserModel) ResetPassword(token, password string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), 12)
+	if err != nil {
+		return err
+	}
+	hash := sha256.Sum256([]byte(token))
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var userID int
+	err = tx.QueryRow(`SELECT user_id FROM password_reset_tokens WHERE token_hash = ? AND expires_at > UTC_TIMESTAMP(6) FOR UPDATE`, hash[:]).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNoRecord
+	}
+	if err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`UPDATE users SET hashed_password = ?, auth_version = auth_version + 1 WHERE id = ?`, string(hashedPassword), userID); err != nil {
+		return err
+	}
+	if _, err = tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = ?`, userID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (m *UserModel) IsAdmin(id int) (bool, error) {

@@ -289,7 +289,18 @@ func (app *application) decodePostForm(r *http.Request, dst any) error {
 // Return true if the current request is from an authenticated user, otherwise
 // return false.
 func (app *application) isAuthenticated(r *http.Request) bool {
-	return app.sessionManager.Exists(r.Context(), "authenticatedUserID")
+	if !app.sessionManager.Exists(r.Context(), "authenticatedUserID") {
+		return false
+	}
+	id := app.sessionManager.GetInt(r.Context(), "authenticatedUserID")
+	sessionVersion := app.sessionManager.GetInt(r.Context(), "authenticatedAuthVersion")
+	version, err := app.users.AuthVersion(id)
+	if err != nil || sessionVersion < 1 || sessionVersion != version {
+		app.sessionManager.Remove(r.Context(), "authenticatedUserID")
+		app.sessionManager.Remove(r.Context(), "authenticatedAuthVersion")
+		return false
+	}
+	return true
 }
 
 func (app *application) isAdmin(r *http.Request) bool {

@@ -56,4 +56,18 @@ func TestEmbeddedMigrations(t *testing.T) {
 			t.Errorf("table %s is not created", table)
 		}
 	}
+	resetMigration, err := migrationFiles.ReadFile("migrations/0003_password_resets.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(resetMigration), "CREATE TABLE IF NOT EXISTS password_reset_tokens") || !strings.Contains(string(resetMigration), "auth_version") {
+		t.Fatal("password reset migration is incomplete")
+	}
+	reviewMigration, err := migrationFiles.ReadFile("migrations/0004_unique_reviews.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(reviewMigration), "reviews_movie_user_uc") || !strings.Contains(string(reviewMigration), "DELETE older") {
+		t.Fatal("unique review migration is incomplete")
+	}
 }

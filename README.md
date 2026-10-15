@@ -28,7 +28,7 @@
 - หน้าแรกแสดง Hero จากภาพยนตร์ยอดนิยมบน TMDB, ภาพยนตร์ใหม่, Top Picks พร้อมตัวอย่างรีวิว และนักแสดงที่กำลังมาแรง
 - รายการภาพยนตร์และนักแสดงแบบแบ่งหน้า ค้นหาแบบ dropdown (`/movies/search`, `/actors/search`)
 - หน้ารายละเอียดภาพยนตร์พร้อมนักแสดง รีวิวแบ่งหน้าละ 10 รายการ เรียงล่าสุดหรือ `?sort=popular`
-- สมัครสมาชิก / เข้าสู่ระบบ / ออกจากระบบ (bcrypt) เขียนและแก้ไขรีวิว (0.5–5 ดาว, ซ่อนสปอยล์ได้) อัปโหลดรูปโปรไฟล์
+- สมัครสมาชิก / เข้าสู่ระบบ / ออกจากระบบ / รีเซ็ตรหัสผ่านทางอีเมล (bcrypt) เขียนและแก้ไขรีวิว (0.5–5 ดาว, ซ่อนสปอยล์ได้) อัปโหลดรูปโปรไฟล์
 - ผู้ดูแลระบบ: นำเข้าภาพยนตร์/นักแสดงจาก TMDB เพิ่ม แก้ไข ลบ และอัปโหลดโปสเตอร์/ภาพพื้นหลัง
 - คะแนนเฉลี่ยและจำนวนรีวิวคำนวณใหม่ใน transaction เดียวกับการเขียนรีวิว
 
@@ -134,6 +134,11 @@ go run ./cmd/web -migrate -dsn "movie_app:password@tcp(localhost:3306)/movies"
 | `-trust-proxy` | `TRUST_PROXY` | `false` | เชื่อ `X-Real-IP` / `X-Forwarded-For` / `X-Forwarded-Proto` เปิดเฉพาะเมื่ออยู่หลัง reverse proxy ที่ไว้ใจได้ |
 | `-migrate` | `DB_MIGRATE` | `false` | สร้าง/อัปเดตตารางก่อนเริ่มเซิร์ฟเวอร์ |
 | `-healthcheck` | — | — | เรียก `/healthz` ของตัวเองแล้วจบ (ใช้กับ Docker HEALTHCHECK) |
+| `-public-base-url` | `PUBLIC_BASE_URL` | `http://localhost:4000` | URL หลักที่ใช้สร้างลิงก์รีเซ็ตรหัสผ่าน Production ต้องเป็น `https://movieclubth.com` |
+| `-smtp-host`, `-smtp-port` | `SMTP_HOST`, `SMTP_PORT` | ว่าง, `587` | SMTP สำหรับส่งอีเมลรีเซ็ตรหัสผ่าน หาก host ว่างระบบจะไม่ส่งอีเมล |
+| `-smtp-username`, `-smtp-password` | `SMTP_USERNAME`, `SMTP_PASSWORD` | ว่าง | บัญชี SMTP เก็บไว้ใน `.env` เท่านั้น |
+| `-mail-from` | `MAIL_FROM` | ว่าง | อีเมลผู้ส่ง เช่น `no-reply@movieclubth.com` |
+| `-smtp-require-tls` | `SMTP_REQUIRE_TLS` | `true` | บังคับ SMTP ให้ใช้ STARTTLS |
 
 คำสั่งนำเข้าข้อมูล (ทำงานเสร็จแล้วจบโปรแกรม): `-import-tmdb N`, `-import-person-details`, `-import-trending-people N`, `-sync-tmdb-metadata`, `-migrate-catalog-metadata`
 
@@ -155,11 +160,11 @@ Production รันอยู่ที่ <https://movieclubth.com> บนเซ
 
 1. ใน Hestia: เพิ่ม web domain และเปิด SSL (Let's Encrypt) แล้วสร้างฐานข้อมูล MySQL ของผู้ใช้เจ้าของโดเมน
 2. คัดลอกไฟล์ใน `deploy/hestia/` ไปที่ `/opt/movie-reviews/` (`install.sh` และไฟล์ template ไว้ใน `/opt/movie-reviews/hestia/`)
-3. สร้าง `/opt/movie-reviews/.env` จาก `deploy/hestia/.env.example` แล้ว `chmod 600`
+3. สร้าง `/opt/movie-reviews/.env` จาก `deploy/hestia/.env.example` ตั้งค่าฐานข้อมูลและ SMTP แล้ว `chmod 600`
 4. ติดตั้ง proxy template และเปิดสถิติ: `bash /opt/movie-reviews/hestia/install.sh <hestia-user> <domain>`
 5. เริ่มแอป: `cd /opt/movie-reviews && sh deploy.sh ghcr.io/zetshin/movie-reviews:latest`
 
-ตารางจะถูกสร้างหรืออัปเดตให้อัตโนมัติตอนเริ่ม ถ้าเป็นฐานข้อมูลเดิมที่สร้างตาม README เวอร์ชันเก่า migration `0002` จะเติมคอลัมน์และ index ที่ขาดให้
+ตารางจะถูกสร้างหรืออัปเดตให้อัตโนมัติตอนเริ่ม ถ้าเป็นฐานข้อมูลเดิมที่สร้างตาม README เวอร์ชันเก่า migration `0002` จะเติมคอลัมน์และ index ที่ขาดให้ และ migration `0003` จะเพิ่ม token รีเซ็ตรหัสผ่านกับเวอร์ชัน session
 
 ### ตั้งค่า GitHub (Settings → Secrets and variables → Actions)
 

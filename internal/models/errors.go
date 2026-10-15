@@ -11,5 +11,6 @@ var (
 	ErrInvalidCredentials = errors.New("models: invalid credentials")
 	// Add a new ErrDuplicateEmail error. We'll use this later if a user
 	// tries to sign up with an email address that's already in use.
-	ErrDuplicateEmail = errors.New("models: duplicate email")
+	ErrDuplicateEmail  = errors.New("models: duplicate email")
+	ErrDuplicateReview = errors.New("models: user has already reviewed this movie")
 )

@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/go-sql-driver/mysql"
 )
 
 type Review struct {
@@ -19,6 +21,7 @@ type Review struct {
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
 	LikeCount   int
+	LikedByUser bool
 }
 type ReviewModel struct {
 	DB *sql.DB
@@ -103,6 +106,7 @@ func (m *ReviewModel) UpdateForUser(rating float64, text string, isSpoiler bool,
 
 func (m *ReviewModel) ListByMovieID(
 	movieID int,
+	viewerID int,
 	sort string,
 	limit int,
 	offset int,
@@ -120,7 +124,8 @@ func (m *ReviewModel) ListByMovieID(
 	stmt := fmt.Sprintf(`
         SELECT r.id, r.movie_id, r.user_id, u.username, COALESCE(u.avatar_image, ''),
 		r.rating, r.review_text, r.is_spoiler, r.created_at, r.updated_at,
-		COUNT(rl.user_id) AS like_count
+		COUNT(rl.user_id) AS like_count,
+		EXISTS(SELECT 1 FROM review_likes mine WHERE mine.review_id = r.id AND mine.user_id = ?) AS liked_by_user
         FROM reviews AS r
 		JOIN users AS u
 		ON u.id = r.user_id
@@ -132,7 +137,7 @@ func (m *ReviewModel) ListByMovieID(
         %s
         LIMIT ? OFFSET ?`, orderBy)
 
-	rows, err := m.DB.Query(stmt, movieID, limit, offset)
+	rows, err := m.DB.Query(stmt, viewerID, movieID, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +146,7 @@ func (m *ReviewModel) ListByMovieID(
 	for rows.Next() {
 		var r Review
 		err = rows.Scan(&r.ID, &r.MovieID, &r.UserID, &r.Username, &r.AvatarImage,
-			&r.Rating, &r.Review, &r.IsSpoiler, &r.CreatedAt, &r.UpdatedAt, &r.LikeCount)
+			&r.Rating, &r.Review, &r.IsSpoiler, &r.CreatedAt, &r.UpdatedAt, &r.LikeCount, &r.LikedByUser)
 		if err != nil {
 			return nil, err
 		}
@@ -153,6 +158,50 @@ func (m *ReviewModel) ListByMovieID(
 	}
 	return reviews, nil
 
+}
+
+// IDByMovieAndUser returns the user's existing review for a movie.
+func (m *ReviewModel) IDByMovieAndUser(movieID, userID int) (int, error) {
+	var id int
+	err := m.DB.QueryRow(`SELECT id FROM reviews WHERE movie_id = ? AND user_id = ?`, movieID, userID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNoRecord
+	}
+	return id, err
+}
+
+// ToggleLike changes the current user's reaction and returns the movie and new state.
+func (m *ReviewModel) ToggleLike(reviewID, userID int) (int, bool, error) {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return 0, false, err
+	}
+	defer tx.Rollback()
+	var movieID int
+	if err := tx.QueryRow(`SELECT movie_id FROM reviews WHERE id = ? FOR UPDATE`, reviewID).Scan(&movieID); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return 0, false, ErrNoRecord
+		}
+		return 0, false, err
+	}
+	result, err := tx.Exec(`DELETE FROM review_likes WHERE review_id = ? AND user_id = ?`, reviewID, userID)
+	if err != nil {
+		return 0, false, err
+	}
+	removed, err := result.RowsAffected()
+	if err != nil {
+		return 0, false, err
+	}
+	liked := removed == 0
+	if liked {
+		if _, err := tx.Exec(`INSERT INTO review_likes (review_id, user_id) VALUES (?, ?)`, reviewID, userID); err != nil {
+			return 0, false, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, false, err
+	}
+	return movieID, liked, nil
 }
 
 func (m *ReviewModel) CountByMovieID(movieID int) (int, error) {
@@ -205,6 +254,10 @@ func (m *ReviewModel) Insert(movieID, userID int, rating float64, reviewText str
 	VALUES(?,?,?,?,?)`
 	result, err := tx.Exec(stmt, movieID, userID, rating, reviewText, isSpoiler)
 	if err != nil {
+		var mysqlErr *mysql.MySQLError
+		if errors.As(err, &mysqlErr) && mysqlErr.Number == 1062 {
+			return 0, ErrDuplicateReview
+		}
 		return 0, err
 	}
 	id, err := result.LastInsertId()
