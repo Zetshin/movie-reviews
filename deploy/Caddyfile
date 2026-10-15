@@ -1,0 +1,19 @@
+{$DOMAIN} {
+	encode zstd gzip
+
+	# Caddy sets X-Forwarded-For/Proto and overwrites any client-supplied
+	# values, which is what lets the app run with TRUST_PROXY=true.
+	reverse_proxy app:4000 {
+		health_uri /healthz
+		health_interval 30s
+	}
+
+	# Uploaded files and static assets can be cached by browsers.
+	@static path /static/*
+	header @static Cache-Control "public, max-age=3600"
+
+	log {
+		output stdout
+		format console
+	}
+}
