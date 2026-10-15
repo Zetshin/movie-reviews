@@ -6,6 +6,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -67,7 +68,7 @@ func Migrate(db *sql.DB) (int, error) {
 		// MySQL DDL commits implicitly, so statements run one by one; each
 		// migration is written to be idempotent instead of transactional.
 		for _, stmt := range splitSQL(string(body)) {
-			if _, err := conn.ExecContext(ctx, stmt); err != nil {
+			if err := execMigrationStatement(ctx, conn, stmt); err != nil {
 				return applied, fmt.Errorf("migration %s: %w", version, err)
 			}
 		}
@@ -77,6 +78,44 @@ func Migrate(db *sql.DB) (int, error) {
 		applied++
 	}
 	return applied, nil
+}
+
+// addColumnRX matches "ALTER TABLE t ADD COLUMN IF NOT EXISTS c <definition>".
+var addColumnRX = regexp.MustCompile(`(?is)^ALTER\s+TABLE\s+` + "`?" + `(\w+)` + "`?" + `\s+ADD\s+COLUMN\s+IF\s+NOT\s+EXISTS\s+` + "`?" + `(\w+)` + "`?" + `\s+(.+)$`)
+
+// createIndexRX matches "CREATE [UNIQUE] INDEX IF NOT EXISTS i ON t (cols)".
+var createIndexRX = regexp.MustCompile(`(?is)^CREATE\s+(UNIQUE\s+)?INDEX\s+IF\s+NOT\s+EXISTS\s+` + "`?" + `(\w+)` + "`?" + `\s+ON\s+` + "`?" + `(\w+)` + "`?" + `\s*(\(.+\))$`)
+
+// execMigrationStatement runs one statement. MySQL 8 does not support
+// "ADD COLUMN IF NOT EXISTS" or "CREATE INDEX IF NOT EXISTS" (MariaDB does),
+// so those forms are emulated with information_schema checks to keep
+// migrations portable between both.
+func execMigrationStatement(ctx context.Context, conn *sql.Conn, stmt string) error {
+	if m := addColumnRX.FindStringSubmatch(stmt); m != nil {
+		table, column, definition := m[1], m[2], m[3]
+		var exists int
+		err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.columns
+			WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`, table, column).Scan(&exists)
+		if err != nil || exists > 0 {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, fmt.Sprintf("ALTER TABLE `%s` ADD COLUMN `%s` %s", table, column, definition))
+		return err
+	}
+	if m := createIndexRX.FindStringSubmatch(stmt); m != nil {
+		unique, index, table, columns := m[1], m[2], m[3], m[4]
+		// Skip when an index with this name already exists.
+		var exists int
+		err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM information_schema.statistics
+			WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ?`, table, index).Scan(&exists)
+		if err != nil || exists > 0 {
+			return err
+		}
+		_, err = conn.ExecContext(ctx, fmt.Sprintf("CREATE %sINDEX `%s` ON `%s` %s", strings.ToUpper(unique), index, table, columns))
+		return err
+	}
+	_, err := conn.ExecContext(ctx, stmt)
+	return err
 }
 
 // splitSQL splits a migration file into statements. It removes full-line
