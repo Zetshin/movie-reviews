@@ -21,8 +21,12 @@ import (
 	"github.com/alexedwards/scs/mysqlstore"
 	"github.com/alexedwards/scs/v2"
 	"github.com/go-playground/form/v4"
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
+
+	// Embed the time zone database: the distroless image has none, and the
+	// TZ environment variable controls how dates are shown to visitors.
+	_ "time/tzdata"
 )
 
 // version is set at build time with -ldflags "-X main.version=...".
@@ -288,7 +292,33 @@ func runHealthcheck(cfg config) int {
 	return 0
 }
 
+// normalizeDSN enforces connection settings the models rely on:
+//   - parseTime=true so DATE/DATETIME columns scan into time.Time;
+//   - a UTC session time zone, so CURRENT_TIMESTAMP defaults, UTC_TIMESTAMP()
+//     and the TIMESTAMP column used by the session store all agree even when
+//     the server's system time zone is not UTC (e.g. MariaDB on a +07 host).
+func normalizeDSN(dsn string) (string, error) {
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return "", err
+	}
+	cfg.ParseTime = true
+	cfg.Loc = time.UTC
+	if cfg.Params == nil {
+		cfg.Params = map[string]string{}
+	}
+	if _, ok := cfg.Params["time_zone"]; !ok {
+		cfg.Params["time_zone"] = "'+00:00'"
+	}
+	return cfg.FormatDSN(), nil
+}
+
 func openDB(dsn string) (*sql.DB, error) {
+	dsn, err := normalizeDSN(dsn)
+	if err != nil {
+		// Never wrap the DSN itself: it contains the password.
+		return nil, errors.New("invalid DB_DSN format")
+	}
 	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
