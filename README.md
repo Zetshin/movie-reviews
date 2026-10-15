@@ -138,7 +138,16 @@ go run ./cmd/web -migrate -dsn "movie_app:password@tcp(localhost:3306)/movies"
 | `-smtp-host`, `-smtp-port` | `SMTP_HOST`, `SMTP_PORT` | ว่าง, `587` | SMTP สำหรับส่งอีเมลรีเซ็ตรหัสผ่าน หาก host ว่างระบบจะไม่ส่งอีเมล |
 | `-smtp-username`, `-smtp-password` | `SMTP_USERNAME`, `SMTP_PASSWORD` | ว่าง | บัญชี SMTP เก็บไว้ใน `.env` เท่านั้น |
 | `-mail-from` | `MAIL_FROM` | ว่าง | อีเมลผู้ส่ง เช่น `no-reply@movieclubth.com` |
-| `-smtp-require-tls` | `SMTP_REQUIRE_TLS` | `true` | บังคับ SMTP ให้ใช้ STARTTLS |
+| `-smtp-require-tls` | `SMTP_REQUIRE_TLS` | `true` | บังคับ SMTP ให้ใช้ STARTTLS (ถ้าตั้ง username/password ต้องเป็น `true`) |
+
+### ลืมรหัสผ่าน
+
+- **หน้าใช้งาน:** `/user/forgot-password` (มีลิงก์จากหน้า login) และ `/user/reset-password?token=...`
+- **ลิงก์รีเซ็ต:** ใช้ได้ 30 นาทีและใช้ได้ครั้งเดียว ในฐานข้อมูลเก็บเฉพาะ hash ของ token เมื่อรีเซ็ตสำเร็จ session เก่าทุกอันของบัญชีนั้นจะหลุด
+- **อีเมล:** ภาษาไทยและอังกฤษ ส่งไปที่อีเมลที่บันทึกในบัญชี ส่งเบื้องหลังจึงไม่ทำให้หน้าเว็บช้า และใช้เวลาตอบเท่ากันไม่ว่าอีเมลจะมีในระบบหรือไม่
+- **จำกัดการส่ง:** 3 ฉบับ/ชั่วโมง/อีเมล ร่วมกับ 10 คำขอ/นาที/IP และส่งพร้อมกันได้สูงสุด 4 ฉบับ
+- **ถ้าไม่ได้ตั้ง SMTP:** ระบบไม่สร้าง token และแสดงข้อความเดิม log ของแอปจะบอกว่าส่งสำเร็จ (`password reset email sent`) หรือมีข้อผิดพลาด
+- **Production:** ใช้ `mail.movieclubth.com:587` (STARTTLS) บัญชี `no-reply@movieclubth.com` ของ Hestia โดเมนมี SPF, DKIM และ DMARC แล้ว
 
 คำสั่งนำเข้าข้อมูล (ทำงานเสร็จแล้วจบโปรแกรม): `-import-tmdb N`, `-import-person-details`, `-import-trending-people N`, `-sync-tmdb-metadata`, `-migrate-catalog-metadata`
 

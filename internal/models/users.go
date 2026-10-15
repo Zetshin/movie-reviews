@@ -128,30 +128,36 @@ func (m *UserModel) AuthVersion(id int) (int, error) {
 	return version, err
 }
 
-// CreatePasswordReset replaces any earlier token for the email. Unknown
-// addresses deliberately return nil so callers cannot enumerate accounts.
-func (m *UserModel) CreatePasswordReset(email string, token string, expiresAt time.Time) (bool, error) {
+// CreatePasswordReset replaces any earlier token for the account and returns
+// the address stored for it, which is where the email must be sent (not the
+// address as typed). Unknown addresses return found=false and no error so
+// callers cannot enumerate accounts.
+func (m *UserModel) CreatePasswordReset(email string, token string, expiresAt time.Time) (string, bool, error) {
 	tx, err := m.DB.Begin()
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	defer tx.Rollback()
 	var userID int
-	err = tx.QueryRow(`SELECT id FROM users WHERE email = ? FOR UPDATE`, strings.TrimSpace(email)).Scan(&userID)
+	var stored string
+	err = tx.QueryRow(`SELECT id, email FROM users WHERE email = ? FOR UPDATE`, strings.TrimSpace(email)).Scan(&userID, &stored)
 	if errors.Is(err, sql.ErrNoRows) {
-		return false, nil
+		return "", false, nil
 	}
 	if err != nil {
-		return false, err
+		return "", false, err
 	}
 	if _, err = tx.Exec(`DELETE FROM password_reset_tokens WHERE user_id = ? OR expires_at <= UTC_TIMESTAMP(6)`, userID); err != nil {
-		return false, err
+		return "", false, err
 	}
 	hash := sha256.Sum256([]byte(token))
 	if _, err = tx.Exec(`INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES (?, ?, ?)`, hash[:], userID, expiresAt.UTC()); err != nil {
-		return false, err
+		return "", false, err
 	}
-	return true, tx.Commit()
+	if err := tx.Commit(); err != nil {
+		return "", false, err
+	}
+	return stored, true, nil
 }
 
 func (m *UserModel) PasswordResetTokenValid(token string) (bool, error) {
