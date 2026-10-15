@@ -1,0 +1,78 @@
+/* Versioned file name prevents stale CDN/browser CSS from breaking new markup. */
+.pick-card .review-author {
+  align-items: center;
+}
+
+.pick-card .review-author-person {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pick-card .review-author-person strong {
+  max-width: 120px;
+  overflow: hidden;
+  color: #dce3eb;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pick-card .review-author-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border: 1px solid #ffffff24;
+  border-radius: 50%;
+  background: #17212b;
+  color: var(--gold);
+  font-size: 13px;
+}
+
+.pick-card .review-author-avatar img {
+  display: block;
+  width: 28px;
+  height: 28px;
+  max-width: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.pick-card .pick-spoiler {
+  margin: 0 0 12px;
+  overflow: hidden;
+  border: 1px solid #a77b3d;
+  border-radius: 7px;
+  background: #111820;
+}
+
+.pick-card .pick-spoiler summary {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px;
+  color: #f0c878;
+  cursor: pointer;
+  font-size: 11px;
+  list-style: none;
+}
+
+.pick-card .pick-spoiler summary::-webkit-details-marker {
+  display: none;
+}
+
+.pick-card .pick-spoiler summary span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.pick-card .pick-spoiler .review-quote {
+  display: block;
+  min-height: 0;
+  margin: 0;
+  padding: 12px;
+  border-top: 1px solid #a77b3d66;
+}
