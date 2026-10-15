@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,12 +19,17 @@ type PersonDetails struct {
 
 // GetPerson prefers Thai biography text, falling back to English if absent.
 func (c *Client) GetPerson(tmdbID int) (PersonDetails, error) {
-	person, err := c.getPerson(tmdbID, "th-TH")
+	return c.GetPersonContext(context.Background(), tmdbID)
+}
+
+// One deadline covers both Thai and English requests during interactive imports.
+func (c *Client) GetPersonContext(ctx context.Context, tmdbID int) (PersonDetails, error) {
+	person, err := c.getPerson(ctx, tmdbID, "th-TH")
 	if err != nil {
 		return PersonDetails{}, err
 	}
 	if strings.TrimSpace(person.Biography) == "" {
-		english, err := c.getPerson(tmdbID, "en-US")
+		english, err := c.getPerson(ctx, tmdbID, "en-US")
 		if err != nil {
 			return PersonDetails{}, err
 		}
@@ -32,11 +38,11 @@ func (c *Client) GetPerson(tmdbID int) (PersonDetails, error) {
 	return person, nil
 }
 
-func (c *Client) getPerson(tmdbID int, language string) (PersonDetails, error) {
+func (c *Client) getPerson(ctx context.Context, tmdbID int, language string) (PersonDetails, error) {
 	if tmdbID < 1 || c.apiKey == "" {
 		return PersonDetails{}, fmt.Errorf("TMDB person requires a positive ID and an API key")
 	}
-	req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/person/%d", tmdbID), nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("https://api.themoviedb.org/3/person/%d", tmdbID), nil)
 	if err != nil {
 		return PersonDetails{}, fmt.Errorf("could not create TMDB person request")
 	}

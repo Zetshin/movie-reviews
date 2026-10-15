@@ -9,23 +9,11 @@
   <title>{{template "title" .}} · MovieClub TH</title>
   <link rel="stylesheet" href="/static/css/home.css">
   <link rel="icon" href="/static/img/favicon.ico">
-  <script src="/static/js/home.js" defer></script>
+  <script src="/static/js/home.js?v=actors-route-12" defer></script>
 </head>
 <body>
   <a class="skip-link" href="#content">Skip to content</a>
-  <header class="site-header">
-    <a class="brand" href="/" aria-label="MovieClub TH home">Movie<span>Club</span> TH<span class="brand-dot">.</span></a>
-    <nav class="navigation" aria-label="Main navigation"><a class="active" href="/">Discover</a><a href="/movies/">Movies</a><a href="#actors">People</a><a href="#about">About</a></nav>
-    <div class="search" data-movie-search>
-      <span aria-hidden="true">⌕</span>
-      <input type="search" role="combobox" aria-label="Search movies and people" aria-autocomplete="list" aria-expanded="false" aria-controls="movie-search-results" placeholder="Search movies and people" maxlength="100" autocomplete="off">
-      <div class="search-dropdown" hidden><p class="search-status" role="status" aria-live="polite"></p><ul id="movie-search-results" role="listbox"></ul></div>
-    </div>
-    <div class="account">
-      {{if .IsAuthenticated}}<a class="account-avatar" href="/profile" aria-label="Your profile">{{if .User.AvatarImage}}<img src="{{.User.AvatarImage}}" alt="">{{else}}<span aria-hidden="true">♙</span>{{end}}</a><form action="/user/logout" method="POST"><input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><button class="button subtle" type="submit">Logout</button></form>{{if .IsAdmin}}<a class="button gold compact" href="/movies/add">Admin</a>{{end}}
-      {{else}}<a class="sign-in" href="/user/login">Login</a><a class="button gold compact" href="/user/signup">Sign up <span aria-hidden="true">↗</span></a>{{end}}
-    </div>
-  </header>
+  {{template "nav" .}}
   <main id="content">
     {{with .Flash}}<div class="flash">{{.}}</div>{{end}}
     {{template "main" .}}
@@ -39,17 +27,17 @@
 {{define "main"}}
 <section class="hero" aria-label="Featured movies" aria-roledescription="carousel">
   <div class="hero-slides">
-    {{if .Movies}}{{range $index, $movie := .Movies}}{{if lt $index 5}}
+    {{if .HeroMovies}}{{range $index, $movie := .HeroMovies}}{{if lt $index 5}}
     <article class="hero-slide" data-slide {{if ne $index 0}}hidden{{end}} aria-label="{{.Title}}">
       <div class="hero-art" aria-hidden="true">{{if .BackdropImage}}<img src="{{.BackdropImage}}" alt="" {{if ne $index 0}}loading="lazy"{{else}}fetchpriority="high"{{end}}>{{else}}<img src="/static/img/cinematic-landscape.svg" alt="">{{end}}</div>
-      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> THE LATEST RELEASE</p>{{if not .BackdropImage}}<p class="art-note">Backdrop unavailable · decorative illustration</p>{{end}}<h1>{{.Title}}</h1>
+      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> POPULAR ON TMDB</p><h1>{{.Title}}</h1>
       <div class="hero-meta">{{if not .ReleaseDate.IsZero}}<span>{{.ReleaseDate.Format "2006"}}</span><span class="divider">/</span>{{end}}<span class="rating">★ {{if .AvgRating}}{{.AvgRating}}<small> / 5</small>{{else}}Not rated{{end}}</span>{{if .ReviewCount}}<span class="muted">{{.ReviewCount}} reviews</span>{{end}}</div>
       <p class="synopsis">{{if .Description}}{{.Description}}{{else}}Discover this film and see what other movie lovers think.{{end}}</p><a class="button gold" href="/movies/{{.ID}}">Explore the movie <span aria-hidden="true">↗</span></a></div>
     </article>{{end}}{{end}}
     {{else}}
     <article class="hero-slide" data-slide aria-label="No featured movies yet">
       <div class="hero-art" aria-hidden="true"><img src="/static/img/cinematic-landscape.svg" alt=""></div>
-      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> YOUR NEXT GREAT WATCH</p><h1>A new story<br>starts here.</h1><p class="synopsis">No movies have been added yet. Once a movie is imported, it will appear here.</p>{{if .IsAdmin}}<a class="button gold" href="/movies/add">Import a movie <span aria-hidden="true">↗</span></a>{{else}}<a class="button gold" href="/movies/">Browse movies <span aria-hidden="true">↗</span></a>{{end}}</div>
+      <div class="hero-copy"><p class="eyebrow"><span class="tiny-line"></span> YOUR NEXT GREAT WATCH</p><h1>A new story<br>starts here.</h1><p class="synopsis">Popular movies with backdrop images will appear here once they are in our library.</p>{{if .IsAdmin}}<a class="button gold" href="/movies/add">Import a movie <span aria-hidden="true">↗</span></a>{{else}}<a class="button gold" href="/movies/">Browse movies <span aria-hidden="true">↗</span></a>{{end}}</div>
     </article>{{end}}
   </div>
   <div class="hero-bottom"><span class="hero-caption">STORIES WORTH YOUR TIME</span><div class="carousel-controls"><div class="slide-dots" aria-label="Choose featured movie"></div><button class="circle" type="button" data-carousel="previous" aria-label="Previous movie">←</button><button class="circle" type="button" data-carousel="next" aria-label="Next movie">→</button><button class="circle pause-button" type="button" data-carousel="pause" aria-label="Pause automatic slides">Ⅱ</button></div></div>
@@ -73,8 +61,8 @@
 </section>
 
 <section class="movie-section actors-section" id="actors" aria-labelledby="actors-title">
-  <div class="section-heading"><div><p class="eyebrow">IN THE SPOTLIGHT THIS WEEK</p><h2 id="actors-title">Trending people<span class="gold-text">.</span></h2></div><span class="section-note">Weekly TMDB trends · updated on import</span></div>
-  <div class="actors-grid">{{if .Actors}}{{range $index, $person := .Actors}}{{if lt $index 6}}<a class="actor-card" href="/persons/{{.ID}}"><div class="actor-image">{{if .ProfileImage}}<img src="{{.ProfileImage}}" alt="{{.Name}}" loading="lazy">{{end}}<span aria-hidden="true">◎</span></div><h3>{{.Name}}</h3><p>View profile →</p></a>{{end}}{{end}}{{else}}<p class="empty-state">Trending people have not been imported yet.</p>{{end}}</div>
+  <div class="section-heading"><div><p class="eyebrow">IN THE SPOTLIGHT THIS WEEK</p><h2 id="actors-title">Trending actors<span class="gold-text">.</span></h2></div><span class="section-note">Weekly TMDB trends · updated on import</span></div>
+  <div class="actors-grid">{{if .Actors}}{{range $index, $person := .Actors}}{{if lt $index 6}}<a class="actor-card" href="/actors/{{.ID}}"><div class="actor-image">{{if .ProfileImage}}<img src="{{.ProfileImage}}" alt="{{.Name}}" loading="lazy">{{end}}<span aria-hidden="true">◎</span></div><h3>{{.Name}}</h3><p>View profile →</p></a>{{end}}{{end}}{{else}}<p class="empty-state">Trending actors have not been imported yet.</p>{{end}}</div>
 </section>
 <div class="closing-note"><span class="gold-text" aria-hidden="true">✦</span><p>Less scrolling. More great cinema.</p><a class="text-link" href="/movies/">Find your next watch ↗</a></div>
 </div>

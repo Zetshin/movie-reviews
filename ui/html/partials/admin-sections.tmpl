@@ -1,0 +1,6 @@
+{{define "admin-sections"}}
+<nav class="admin-sections" aria-label="Admin library sections">
+<a class="admin-section-card {{if ne .AdminSection "people"}}active{{end}}" href="/movies/add" {{if ne .AdminSection "people"}}aria-current="page"{{end}}><span class="eyebrow">MOVIE LIBRARY</span><strong>Movies</strong><span>Import movies with their cast, or add your own.</span></a>
+<a class="admin-section-card {{if eq .AdminSection "people"}}active{{end}}" href="/actors/add" {{if eq .AdminSection "people"}}aria-current="page"{{end}}><span class="eyebrow">ACTOR LIBRARY</span><strong>Actors</strong><span>Find actors, import biographies, or add a profile.</span></a>
+</nav>
+{{end}}

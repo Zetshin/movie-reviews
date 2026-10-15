@@ -1,65 +1,62 @@
 {{define "title"}}Manage Movies{{end}}
-
 {{define "main"}}
-<div class="page-heading"><div><p class="eyebrow">ADMIN / MOVIE LIBRARY</p><h1>Add a movie.</h1><p>Import a movie and its cast from TMDB, or add one manually.</p></div></div>
+{{template "admin-sections" .}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / MOVIE LIBRARY</p><h1>Build your movie library.</h1><p class="muted">Browse TMDB, select movies, and import them with their cast.</p></div><a class="button subtle" href="/movies/">View library</a></div>
 <section class="tmdb-admin" aria-labelledby="tmdb-heading">
-<h2 id="tmdb-heading">Find a movie on TMDB</h2>
-<p class="tmdb-help">Search by title. Thai translations are shown when available. Results show the first page; refine the title if your movie is missing.</p>
-<form action="/movies/add" method="GET" class="tmdb-search-form">
-<label for="tmdb-query">Movie title</label>
-<div class="tmdb-search-controls"><input type="search" id="tmdb-query" name="q" value="{{.TMDBSearch}}" maxlength="100" placeholder="Search Thai or English titles" required><button class="button gold" type="submit">Search TMDB</button></div>
+<h2 id="tmdb-heading">Discover &amp; import</h2>
+<form action="/movies/add" method="GET" class="tmdb-browse-form">
+<div><label for="tmdb-category">Browse</label><select id="tmdb-category" name="category"><option value="popular" {{if eq .TMDBCategory "popular"}}selected{{end}}>Popular movies</option><option value="now_playing" {{if eq .TMDBCategory "now_playing"}}selected{{end}}>Now playing in Thailand</option><option value="search" {{if eq .TMDBCategory "search"}}selected{{end}}>Search by title</option></select></div>
+<div><label for="tmdb-query">Search by title (optional)</label><input id="tmdb-query" type="search" name="q" value="{{.TMDBSearch}}" maxlength="100" placeholder="Type a title to search, or leave blank to browse"></div>
+<button class="button gold" type="submit">Browse TMDB</button>
 </form>
 {{with .TMDBError}}<p class="error" role="alert">{{.}}</p>{{end}}
-{{if .TMDBSearchDone}}
 {{if .TMDBMovies}}
-<p class="tmdb-help">Searching does not save anything. Choose Import to save a movie and its cast. Existing TMDB records are reused.</p>
+<form class="tmdb-bulk-form" data-bulk-import action="/movies/import" method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<div class="bulk-toolbar"><label><input type="checkbox" data-select-all> Select available movies on this page</label><button class="button gold compact" type="submit" data-import-selected hidden>Import selected</button><span data-selection-count class="muted small">0 selected</span></div>
+<p class="tmdb-help">Import includes movie details and each cast member's available biography, birthday, and photo. Select existing movies to fill missing cast details. Existing edits are kept. Keep this page open until finished.</p>
+<p data-import-progress class="import-progress" role="status" aria-live="polite"></p>
 <div class="tmdb-results">
 {{range .TMDBMovies}}
-<article class="tmdb-result">
-{{if .PosterPath}}<img class="tmdb-poster" src="{{tmdbImageURL .PosterPath}}" alt="Poster for {{.Title}}" loading="lazy">{{else}}<div class="tmdb-poster tmdb-no-poster" aria-label="Poster unavailable">No poster</div>{{end}}
-<div class="tmdb-result-copy"><h3>{{.Title}}</h3><p class="tmdb-help">{{if .ReleaseDate}}{{.ReleaseDate}}{{else}}Release date unavailable{{end}} · TMDB #{{.ID}}</p><p class="tmdb-overview">{{if .Overview}}{{.Overview}}{{else}}No synopsis available.{{end}}</p>
-<form action="/movies/add" method="POST"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><input type="hidden" name="action" value="import_tmdb"><input type="hidden" name="tmdb_id" value="{{.ID}}"><button class="button gold compact" type="submit">Import movie + cast</button></form>
+<article class="tmdb-result" data-import-item>
+{{if .PosterPath}}<img class="tmdb-poster" src="{{tmdbImageURL .PosterPath}}" alt="Poster for {{.Title}}" loading="lazy">{{else}}<div class="tmdb-poster tmdb-no-poster">No poster</div>{{end}}
+<div class="tmdb-result-copy"><h3>{{.Title}}</h3><p class="tmdb-help">{{if .ReleaseDate}}{{.ReleaseDate}}{{else}}Release date unavailable{{end}} &middot; TMDB #{{.ID}}</p><p class="tmdb-overview">{{if .Overview}}{{.Overview}}{{else}}No synopsis available.{{end}}</p>
+<label class="import-choice"><input type="checkbox" name="tmdb_id" value="{{.ID}}"> {{if index $.TMDBImported .ID}}Fill missing cast details{{else}}Select movie{{end}}</label><span class="import-item-status" data-import-status>{{if index $.TMDBImported .ID}}Movie already in library{{end}}</span>
 </div></article>
 {{end}}
 </div>
-{{else if not .TMDBError}}<p class="empty-state">No matches found. Try a different title.</p>{{end}}
-{{else}}<p class="tmdb-help">Start with a title to find movies to import.</p>{{end}}
+<noscript><p class="tmdb-help">Enable JavaScript to select and import multiple movies.</p></noscript>
+</form>
+<nav class="pagination" aria-label="TMDB result pages">{{if .TMDBPreviousURL}}<a class="button subtle compact" href="{{.TMDBPreviousURL}}">&larr; Previous</a>{{end}}{{template "page-links" (pageLinks .TMDBPage .TMDBTotalPages .PageURL "")}}{{if .TMDBNextURL}}<a class="button subtle compact" href="{{.TMDBNextURL}}">Next &rarr;</a>{{end}}</nav>
+{{else if and .TMDBSearchDone (not .TMDBError)}}<p class="empty-state">No movies found. Try another title or category.</p>{{else if not .TMDBError}}<p class="tmdb-help">Enter a title and browse to search TMDB.</p>{{end}}
 </section>
-<h2>Add manually</h2>
-<form action="/movies/add" method="POST">
-<input type='hidden' name='csrf_token' value='{{.CSRFToken}}'>
-    <div>
-        <label for="movie-title">Title</label>
-        <!-- Use the `with` action to render the value of .Form.FieldErrors.title
-        if it is not empty. -->
-        {{with .Form.FieldErrors.title}}
-            <label class='error'>{{.}}</label>
-        {{end}}
-        <!-- repopulate the title data by setting the `value` attribute. -->
-        <input type='text' id='movie-title' name='title' value='{{.Form.Title}}'>
-    </div>
-
-    <div>
-        <label for="movie-description">Description</label>
-        <textarea id="movie-description" name="description">{{.Form.Description}}</textarea>
-    </div>
-
-    <div>
-        <label for="movie-release">Release date</label>
-
-        <input type="date" id="movie-release" name="release_date" value='{{.Form.ReleaseDate}}'>
-        {{with .Form.FieldErrors.release_date}}
-            <label class='error'>{{.}}</label>
-        {{end}}
-    </div>
-
-    <div>
-        <label for="movie-poster">Poster image URL or path</label>
-        <input type="text" id="movie-poster" name="poster_image" value='{{.Form.PosterImage}}'>
-    </div>
-
-    <div>
-        <input type="submit" value="Create Movie">
-    </div>
+<h2>Add a movie manually</h2>
+<form action="/movies/add" method="POST" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<div><label for="movie-title">Title</label>{{with .Form.FieldErrors.title}}<p class="error">{{.}}</p>{{end}}<input id="movie-title" name="title" value="{{.Form.Title}}" maxlength="255" required></div>
+<div><label for="movie-description">Synopsis</label>{{with .Form.FieldErrors.description}}<p class="error">{{.}}</p>{{end}}<textarea id="movie-description" name="description">{{.Form.Description}}</textarea></div>
+<div><label for="movie-release">Release date</label>{{with .Form.FieldErrors.release_date}}<p class="error">{{.}}</p>{{end}}<input id="movie-release" type="date" name="release_date" value="{{.Form.ReleaseDate}}"></div>
+<div class="image-picker" data-image-picker><label for="movie-poster">Poster image URL or local path</label>{{with .Form.FieldErrors.poster_image}}<p class="error">{{.}}</p>{{end}}<input id="movie-poster" name="poster_image" value="{{.Form.PosterImage}}" maxlength="2048" data-image-url><label class="image-dropzone" for="movie-poster-file" data-image-drop>Or drag a JPG/PNG here, or choose a file (up to 5 MB).<input id="movie-poster-file" type="file" name="poster_image_file" accept="image/jpeg,image/png" data-image-file></label><p data-image-status class="tmdb-help" role="status"></p><img data-image-preview class="image-preview" alt="Poster preview" hidden></div>
+<div class="image-picker" data-image-picker><label for="movie-backdrop">Backdrop image URL or local path</label>{{with .Form.FieldErrors.backdrop_image}}<p class="error">{{.}}</p>{{end}}<input id="movie-backdrop" name="backdrop_image" value="{{.Form.BackdropImage}}" maxlength="2048" data-image-url><label class="image-dropzone" for="movie-backdrop-file" data-image-drop>Or drag a JPG/PNG here, or choose a file (up to 5 MB).<input id="movie-backdrop-file" type="file" name="backdrop_image_file" accept="image/jpeg,image/png" data-image-file></label><p data-image-status class="tmdb-help" role="status"></p><img data-image-preview class="image-preview" alt="Backdrop preview" hidden></div>
+<p class="tmdb-help">Use HTTPS image links. A selected file replaces the URL for that image. After validation errors, select your file again.</p>
+<fieldset class="cast-editor" data-cast-editor>
+<legend>Cast / นักแสดง</legend>
+<p class="tmdb-help">เลือกนักแสดงที่เพิ่มไว้ในเว็บ เรียงคนสำคัญไว้ก่อน ชื่อตัวละครเว้นว่างได้</p>
+<p class="tmdb-help">ยังไม่มีคนที่ต้องการ? <a class="text-link" href="/actors/add" target="_blank" rel="noopener">เพิ่มนักแสดง</a> แล้วรีเฟรชหน้านี้ก่อนกรอกหนัง</p>
+{{with .Form.FieldErrors.cast}}<p class="error" role="alert">{{.}}</p>{{end}}
+<div data-cast-rows>
+{{range .Form.CastRows}}
+{{$row := .}}
+<div class="cast-editor-row" data-cast-row>
+<label>นักแสดง<select name="person_id"><option value="">เลือกนักแสดง</option>{{range $.Actors}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $row.PersonID}}selected{{end}}>{{.Name}}</option>{{end}}</select></label>
+<label>ชื่อตัวละคร<input name="character_name" value="{{.CharacterName}}" maxlength="255" placeholder="รับบทเป็น..." ></label>
+<button class="button subtle compact" type="button" data-remove-cast hidden>ลบ</button>
+</div>
+{{end}}
+</div>
+<button class="button subtle compact" type="button" data-add-cast hidden>+ เพิ่มนักแสดงอีกคน</button>
+<noscript><p class="tmdb-help">เปิด JavaScript เพื่อเลือกนักแสดงหลายคน</p></noscript>
+</fieldset>
+<div class="editor-actions"><button class="button gold" type="submit">Create movie</button></div>
 </form>
 {{end}}

@@ -1,0 +1,9 @@
+{{define "title"}}Delete movie{{end}}
+{{define "main"}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / MOVIE LIBRARY</p><h1>Delete movie?</h1></div></div>
+<form action="/movies/{{.Movie.ID}}/delete" method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><input type="hidden" name="confirm" value="delete">
+<h2>{{.Movie.Title}}</h2><p>This permanently removes this movie, its reviews and likes, and its cast links. Actor profiles are kept. This cannot be undone.</p>
+<div class="editor-actions"><button class="button danger" type="submit">Delete movie</button><a class="button subtle" href="/movies/{{.Movie.ID}}">Cancel</a></div>
+</form>
+{{end}}

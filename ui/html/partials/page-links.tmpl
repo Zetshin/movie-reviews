@@ -1,0 +1,5 @@
+{{define "page-links"}}
+<span class="page-numbers">
+{{range .}}{{if .Number}}{{if .Current}}<span class="button gold compact" aria-current="page" aria-label="Page {{.Number}}">{{.Number}}</span>{{else}}<a class="button subtle compact" href="{{.URL}}" aria-label="Page {{.Number}}">{{.Number}}</a>{{end}}{{else}}<span class="page-gap" aria-hidden="true">&hellip;</span>{{end}}{{end}}
+</span>
+{{end}}

@@ -33,7 +33,7 @@
 <div class="reviews-list">{{range .UserReviews}}
 <article class="review-card profile-review" id="review-{{.ID}}">
 <a class="poster profile-review-poster" href="/movies/{{.MovieID}}">{{if .PosterImage}}<img src="{{.PosterImage}}" alt="Poster for {{.MovieTitle}}" loading="lazy">{{end}}<span class="poster-fallback" aria-hidden="true">MOVIE</span></a>
-<div class="profile-review-copy"><div class="review-header"><h3><a href="/movies/{{.MovieID}}">{{.MovieTitle}}</a></h3><span class="rating">★ {{.Rating}} / 5</span></div><p class="muted small">Reviewed {{humanDate .CreatedAt}}</p><p class="description">{{.ReviewText}}</p><a class="button subtle compact" href="/reviews/{{.ID}}/edit">Edit review</a></div>
+<div class="profile-review-copy"><div class="review-header"><h3><a href="/movies/{{.MovieID}}">{{.MovieTitle}}</a></h3><span class="rating">★ {{.Rating}} / 5</span></div><p class="muted small">Reviewed {{humanDate .CreatedAt}}{{if .IsSpoiler}} · <span class="spoiler-badge">Spoiler</span>{{end}}</p><p class="description">{{.ReviewText}}</p><a class="button subtle compact" href="/reviews/{{.ID}}/edit">Edit review</a></div>
 </article>{{else}}<p class="empty-state">You haven't written a review yet. Find a movie and share your thoughts.</p>{{end}}</div>
 </section>
 {{end}}

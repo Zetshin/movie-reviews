@@ -1,0 +1,9 @@
+{{define "title"}}Delete actor{{end}}
+{{define "main"}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / ACTORS</p><h1>Delete actor?</h1></div></div>
+<form action="/actors/{{.Person.ID}}/delete" method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}"><input type="hidden" name="confirm" value="delete">
+<h2>{{.Person.Name}}</h2><p>This permanently removes this profile and its links to movies. Movies and their reviews are kept. This cannot be undone.</p>
+<div class="editor-actions"><button class="button danger" type="submit">Delete actor</button><a class="button subtle" href="/actors/{{.Person.ID}}">Cancel</a></div>
+</form>
+{{end}}

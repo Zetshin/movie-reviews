@@ -21,10 +21,11 @@
 </div>
 <p class="selected-rating" aria-live="polite">{{if .Form.Rating}}{{.Form.Rating}} / 5 stars{{else}}No rating selected{{end}}</p>
 </fieldset>
-<div><label for="review-text">Your review</label><p class="editor-hint" id="review-hint">What worked for you? What didn't? Please mark spoilers in your text.</p>
+<div><label for="review-text">Your review</label><p class="editor-hint" id="review-hint">What worked for you? What didn't?</p>
 {{with .Form.FieldErrors.review_text}}<p class="error" id="review-error">{{.}}</p>{{end}}
 <textarea id="review-text" name="review_text" maxlength="2000" required placeholder="The scene I keep thinking about…" aria-describedby="review-hint{{with .Form.FieldErrors.review_text}} review-error{{end}}" {{with .Form.FieldErrors.review_text}}aria-invalid="true"{{end}}>{{.Form.ReviewText}}</textarea>
 <p>Up to 2000 characters.</p></div>
+<label class="spoiler-toggle" for="is-spoiler"><input id="is-spoiler" type="checkbox" name="is_spoiler" value="true" {{if .Form.IsSpoiler}}checked{{end}}><span><strong>This review contains spoilers</strong><small>Readers will need to reveal the review before they can read it.</small></span></label>
 <div class="editor-actions"><a class="button subtle" href="{{if .EditingReviewID}}/profile{{else}}/movies/{{.Movie.ID}}#reviews{{end}}">Cancel</a><button class="button gold" type="submit">{{if .EditingReviewID}}Save changes{{else}}Publish review ↗{{end}}</button></div>
 </form>
 {{end}}

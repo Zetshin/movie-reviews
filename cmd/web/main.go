@@ -3,6 +3,7 @@ package main
 import (
 	"crypto/tls"
 	"database/sql"
+	"errors"
 	"flag"
 	"html/template"
 	"log/slog"
@@ -30,12 +31,13 @@ type application struct {
 	persons        *models.PersonModel
 	moviePersons   *models.MoviePersonModel
 	tmdb           *tmdb.Client
+	heroCache      heroCache
 }
 
 func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	err := godotenv.Load()
-	if err != nil {
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		logger.Error("could not load .env", "error", err)
 		os.Exit(1)
 	}
@@ -46,9 +48,13 @@ func main() {
 		os.Exit(1)
 	}
 	addr := flag.String("addr", ":4000", "HTTP network address")
+	tlsEnabled := flag.Bool("tls", true, "Serve HTTPS directly using ./tls/cert.pem and ./tls/key.pem")
+	secureCookie := flag.Bool("secure-cookie", true, "Mark session cookies Secure (disable only for local HTTP testing)")
 	importTMDB := flag.Int("import-tmdb", 0, "Import 1-20 now-playing movies from TMDB, then exit without starting the server")
 	importPeople := flag.Bool("import-person-details", false, "Fill details for imported TMDB people, then exit without starting the server")
 	importTrending := flag.Int("import-trending-people", 0, "Import 1-20 weekly trending people for Home, then exit")
+	migrateMetadata := flag.Bool("migrate-catalog-metadata", false, "Add required catalog and review columns, then exit unless syncing")
+	syncMetadata := flag.Bool("sync-tmdb-metadata", false, "Refresh cast order and character names for imported movies, then exit")
 	dsn := flag.String("dsn", "user:pass@/movies?parseTime=true", "MySQL data source name")
 	flag.Parse() //รับค่าเริ่มต้นจาก user ตอนรันโปรแกรม
 	if *importTMDB < 0 || *importTMDB > 20 {
@@ -69,6 +75,16 @@ func main() {
 	// We also defer a call to db.Close(), so that the connection pool is closed
 	// before the main() function exits.
 	defer db.Close()
+	if *migrateMetadata {
+		if err := models.EnsureCatalogMetadataSchema(db); err != nil {
+			logger.Error("catalog migration failed", "error", err)
+			os.Exit(1)
+		}
+		logger.Info("catalog metadata schema ready")
+		if !*syncMetadata {
+			return
+		}
+	}
 
 	templateCache, err := newTemplateCache()
 	if err != nil {
@@ -82,7 +98,7 @@ func main() {
 	sessionManager.Store = mysqlstore.New(db)
 	sessionManager.Lifetime = 12 * time.Hour
 
-	sessionManager.Cookie.Secure = true
+	sessionManager.Cookie.Secure = *secureCookie
 	app := &application{
 		logger:         logger,
 		movies:         &models.MovieModel{DB: db},
@@ -94,6 +110,13 @@ func main() {
 		persons:        &models.PersonModel{DB: db},
 		moviePersons:   &models.MoviePersonModel{DB: db},
 		tmdb:           tmdb.NewClient(apiKey),
+	}
+	if *syncMetadata {
+		if err := app.syncTMDBMetadata(); err != nil {
+			logger.Error("catalog metadata sync failed", "error", err)
+			os.Exit(1)
+		}
+		return
 	}
 	if *importTMDB > 0 {
 		if err := app.importNowPlayingMovies(*importTMDB); err != nil {
@@ -138,7 +161,11 @@ func main() {
 		WriteTimeout: 10 * time.Second,
 	}
 	logger.Info("starting server", "addr", srv.Addr)
-	err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	if *tlsEnabled {
+		err = srv.ListenAndServeTLS("./tls/cert.pem", "./tls/key.pem")
+	} else {
+		err = srv.ListenAndServe()
+	}
 	logger.Error(err.Error())
 	os.Exit(1)
 }

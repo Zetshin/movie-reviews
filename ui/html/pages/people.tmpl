@@ -1,0 +1,12 @@
+{{define "title"}}Actors{{end}}
+{{define "main"}}
+<div class="page-heading"><div><p class="eyebrow">THE ACTORS BEHIND THE STORIES</p><h1>Actors<span class="gold-text">.</span></h1><p class="muted">Explore the cast in MovieClub TH.</p></div></div>
+<div class="catalog-grid people-catalog">
+{{range .Actors}}
+<a class="movie-card" href="/actors/{{.ID}}">
+<div class="poster"><span class="poster-fallback" aria-hidden="true">MOVIE<br><b>CLUB TH</b></span>{{if .ProfileImage}}<img src="{{.ProfileImage}}" alt="{{.Name}}" loading="lazy">{{end}}</div>
+<div class="card-copy"><h2>{{.Name}}</h2><p class="muted small">View profile &rarr;</p></div>
+</a>
+{{else}}<p class="empty-state">No actors have been added yet.</p>{{end}}
+</div>
+{{end}}

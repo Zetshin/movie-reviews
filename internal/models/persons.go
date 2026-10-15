@@ -3,6 +3,7 @@ package models
 import (
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -69,7 +70,11 @@ func (m *PersonModel) LatestWithImages(limit int) ([]Person, error) {
 func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profileImage string) (int, error) {
 	stmt := `INSERT INTO persons ( name, bio, birth_date, profile_image)
 	VALUES (?,?,?,?)`
-	result, err := m.DB.Exec(stmt, name, bio, birthDate, profileImage)
+	var date any
+	if !birthDate.IsZero() {
+		date = birthDate
+	}
+	result, err := m.DB.Exec(stmt, name, bio, date, profileImage)
 	if err != nil {
 		return 0, err
 	}
@@ -78,6 +83,54 @@ func (m *PersonModel) Insert(name string, bio string, birthDate time.Time, profi
 		return 0, err
 	}
 	return int(id), nil
+}
+
+// Reuse the TMDB ID and fill missing details without replacing administrator edits.
+func (m *PersonModel) ImportTMDB(person Person) (int, error) {
+	if person.TMDBID < 1 || strings.TrimSpace(person.Name) == "" {
+		return 0, errors.New("TMDB person requires an ID and name")
+	}
+	var birthday any
+	if !person.BirthDate.IsZero() {
+		birthday = person.BirthDate
+	}
+	result, err := m.DB.Exec(`INSERT INTO persons (tmdb_id, name, bio, birth_date, profile_image)
+		VALUES (?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE id = LAST_INSERT_ID(id),
+		bio = IF(COALESCE(TRIM(bio), '') = '', ?, bio),
+		birth_date = COALESCE(birth_date, ?),
+		profile_image = IF(COALESCE(TRIM(profile_image), '') = '', ?, profile_image)`,
+		person.TMDBID, person.Name, person.Bio, birthday, person.ProfileImage, person.Bio, birthday, person.ProfileImage)
+	if err != nil {
+		return 0, err
+	}
+	id, err := result.LastInsertId()
+	return int(id), err
+}
+
+func (m *PersonModel) ImportedTMDBIDs(ids []int) (map[int]bool, error) {
+	imported := make(map[int]bool)
+	if len(ids) == 0 {
+		return imported, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	rows, err := m.DB.Query(`SELECT tmdb_id FROM persons WHERE tmdb_id IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		imported[id] = true
+	}
+	return imported, rows.Err()
 }
 
 func (m *PersonModel) Get(id int) (Person, error) {
@@ -209,6 +262,24 @@ func (m *PersonModel) Trending(limit int) ([]Person, error) {
 			return nil, err
 		}
 		people = append(people, p)
+	}
+	return people, rows.Err()
+}
+
+// All returns every locally stored person in name order for the people catalog.
+func (m *PersonModel) All() ([]Person, error) {
+	rows, err := m.DB.Query(`SELECT id, name, COALESCE(profile_image, '') FROM persons ORDER BY name ASC, id ASC`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	people := make([]Person, 0)
+	for rows.Next() {
+		var person Person
+		if err := rows.Scan(&person.ID, &person.Name, &person.ProfileImage); err != nil {
+			return nil, err
+		}
+		people = append(people, person)
 	}
 	return people, rows.Err()
 }

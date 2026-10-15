@@ -12,7 +12,7 @@ func commonHeaders(next http.Handler) http.Handler {
 		// Note: This is split across multiple lines for readability. You don't
 		// need to do this in your own code.
 		w.Header().Set("Content-Security-Policy",
-			"default-src 'self'; img-src 'self' https://image.tmdb.org; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
+			"default-src 'self'; img-src 'self' https: blob:; style-src 'self' fonts.googleapis.com; font-src fonts.gstatic.com")
 		w.Header().Set("Referrer-Policy", "origin-when-cross-origin")
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "deny")
@@ -102,6 +102,14 @@ func preventCSRF(next http.Handler) http.Handler {
 		Secure:   true,
 	})
 	return csrfHandler
+}
+
+// Apply this before CSRF middleware can parse an uploaded movie image.
+func limitMovieUpload(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		r.Body = http.MaxBytesReader(w, r.Body, 12<<20)
+		next.ServeHTTP(w, r)
+	})
 }
 
 // Limit the body before CSRF middleware parses a multipart form.

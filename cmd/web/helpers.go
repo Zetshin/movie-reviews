@@ -2,17 +2,198 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"image"
+	"image/jpeg"
+	"image/png"
 	"net/http"
+	"os"
+	"path/filepath"
+	"regexp"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/Zetshin/movie-reviews/internal/models"
+	"github.com/Zetshin/movie-reviews/internal/validator"
 	"github.com/go-playground/form/v4"
 	"github.com/justinas/nosurf"
 )
+
+// Cache TMDB's ordered IDs in memory, not popularity scores in MySQL.
+type heroCache struct {
+	mu          sync.Mutex
+	ids         []int
+	nextRefresh time.Time
+	refreshing  bool
+}
+
+func (app *application) popularHero(ctx context.Context) ([]models.Movie, error) {
+	cache := &app.heroCache
+	cache.mu.Lock()
+	ids := append([]int(nil), cache.ids...)
+	if time.Now().Before(cache.nextRefresh) || cache.refreshing {
+		cache.mu.Unlock()
+		return app.movies.HeroByTMDBIDs(ids, 5)
+	}
+	cache.refreshing = true
+	cache.mu.Unlock()
+	defer func() { cache.mu.Lock(); cache.refreshing = false; cache.mu.Unlock() }()
+
+	requestCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+	defer cancel()
+	var ordered []int
+	seen := make(map[int]bool)
+	complete := true
+	// Inspect up to 100 popular movies, without importing films just for the Hero.
+	for page := 1; page <= 5; page++ {
+		list, err := app.tmdb.DiscoverMoviesContext(requestCtx, page)
+		if err != nil {
+			app.logger.Error("could not refresh popular Hero", "error", err)
+			complete = false
+			break
+		}
+		for _, movie := range list.Results {
+			if movie.ID > 0 && !seen[movie.ID] {
+				ordered = append(ordered, movie.ID)
+				seen[movie.ID] = true
+			}
+		}
+		if page >= list.TotalPages || len(list.Results) == 0 {
+			break
+		}
+	}
+	cache.mu.Lock()
+	if complete {
+		cache.ids = append([]int(nil), ordered...)
+		cache.nextRefresh = time.Now().Add(30 * time.Minute)
+	} else {
+		// Keep the previous full list if TMDB fails; retry later rather than on every visit.
+		if len(cache.ids) == 0 && len(ordered) > 0 {
+			cache.ids = append([]int(nil), ordered...)
+		}
+		cache.nextRefresh = time.Now().Add(time.Minute)
+	}
+	ids = append([]int(nil), cache.ids...)
+	cache.mu.Unlock()
+	return app.movies.HeroByTMDBIDs(ids, 5)
+}
+
+type catalogImageUpload struct {
+	image  image.Image
+	format string
+}
+
+// An origin is a local movie linked to this person, never an arbitrary redirect URL.
+func personOriginMovie(r *http.Request, filmography []models.FilmographyItem) models.Movie {
+	id, err := strconv.Atoi(r.URL.Query().Get("from_movie"))
+	if err != nil || id < 1 {
+		return models.Movie{}
+	}
+	for _, credit := range filmography {
+		if credit.ID == id {
+			return credit.Movie
+		}
+	}
+	return models.Movie{}
+}
+
+func readImageUploads(r *http.Request, v *validator.Validator, fields ...string) map[string]catalogImageUpload {
+	images := make(map[string]catalogImageUpload)
+	if r.MultipartForm == nil {
+		return images
+	}
+	for _, field := range fields {
+		file, header, err := r.FormFile(field + "_file")
+		if errors.Is(err, http.ErrMissingFile) {
+			continue
+		}
+		if err != nil {
+			v.AddFieldError(field, "Could not read the uploaded image.")
+			continue
+		}
+		func() {
+			defer file.Close()
+			if header.Size > 5<<20 {
+				v.AddFieldError(field, "Choose a JPG or PNG no larger than 5 MB.")
+				return
+			}
+			config, format, err := image.DecodeConfig(file)
+			if err != nil || (format != "jpeg" && format != "png") || config.Width < 1 || config.Height < 1 || int64(config.Width)*int64(config.Height) > 16000000 {
+				v.AddFieldError(field, "Use a JPG or PNG with no more than 16 million pixels.")
+				return
+			}
+			if _, err := file.Seek(0, 0); err != nil {
+				v.AddFieldError(field, "Could not read the uploaded image.")
+				return
+			}
+			decoded, _, err := image.Decode(file)
+			if err != nil {
+				v.AddFieldError(field, "This image could not be decoded.")
+				return
+			}
+			images[field] = catalogImageUpload{image: decoded, format: format}
+		}()
+	}
+	return images
+}
+
+func saveImageUploads(images map[string]catalogImageUpload, section string) (map[string]string, error) {
+	paths := make(map[string]string)
+	if len(images) == 0 {
+		return paths, nil
+	}
+	if section != "movies" && section != "persons" {
+		return nil, errors.New("invalid catalog image directory")
+	}
+	directory := filepath.Join("ui/static/uploads", section)
+	if err := os.MkdirAll(directory, 0755); err != nil {
+		return nil, err
+	}
+	for field, upload := range images {
+		var random [16]byte
+		if _, err := rand.Read(random[:]); err != nil {
+			removeImageUploads(paths)
+			return nil, err
+		}
+		extension := ".png"
+		if upload.format == "jpeg" {
+			extension = ".jpg"
+		}
+		name := hex.EncodeToString(random[:]) + extension
+		file, err := os.OpenFile(filepath.Join(directory, name), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			removeImageUploads(paths)
+			return nil, err
+		}
+		paths[field] = "/static/uploads/" + section + "/" + name
+		if upload.format == "jpeg" {
+			err = jpeg.Encode(file, upload.image, &jpeg.Options{Quality: 90})
+		} else {
+			err = png.Encode(file, upload.image)
+		}
+		closeErr := file.Close()
+		if err != nil || closeErr != nil {
+			removeImageUploads(paths)
+			return nil, errors.Join(err, closeErr)
+		}
+	}
+	return paths, nil
+}
+
+// Only clean up files generated by the current failed save, never a submitted path.
+func removeImageUploads(paths map[string]string) {
+	pattern := regexp.MustCompile(`^/static/uploads/(movies|persons)/([a-f0-9]{32}\.(?:jpg|png))$`)
+	for _, path := range paths {
+		if match := pattern.FindStringSubmatch(path); len(match) == 3 {
+			os.Remove(filepath.Join("ui/static/uploads", match[1], match[2]))
+		}
+	}
+}
 
 func (app *application) render(w http.ResponseWriter, r *http.Request, status int, page string, data templateData) {
 	ts, ok := app.templateCache[page]
@@ -59,6 +240,7 @@ func (app *application) clientError(w http.ResponseWriter, status int) {
 // parameter here at the moment, but we will use it later in the book.
 func (app *application) newTemplateData(r *http.Request) templateData {
 	data := templateData{
+		PageURL:         r.URL.RequestURI(),
 		CurrentYear:     time.Now().Year(),
 		Flash:           app.sessionManager.PopString(r.Context(), "flash"),
 		IsAuthenticated: app.isAuthenticated(r),

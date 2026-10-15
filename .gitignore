@@ -2,3 +2,5 @@
 /output/
 .env
 ui/static/uploads/avatars/
+ui/static/uploads/movies/
+ui/static/uploads/persons/

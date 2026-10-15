@@ -9,4 +9,11 @@
 </a>
 {{else}}<p class="empty-state">No movies yet. Check back soon.</p>{{end}}
 </div>
+{{if gt .Pagination.TotalPages 1}}
+<nav class="pagination" aria-label="Movie pages">
+{{if gt .Pagination.Page 1}}<a class="button subtle compact" href="?page={{.Pagination.PreviousPage}}">&larr; Previous</a>{{end}}
+{{template "page-links" (pageLinks .Pagination.Page .Pagination.TotalPages .PageURL "")}}
+{{if lt .Pagination.Page .Pagination.TotalPages}}<a class="button subtle compact" href="?page={{.Pagination.NextPage}}">Next &rarr;</a>{{end}}
+</nav>
+{{end}}
 {{end}}

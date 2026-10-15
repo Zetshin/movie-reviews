@@ -1,0 +1,7 @@
+./handler.go
+./helpers.go
+./main.go
+./middleware.go
+./routes.go
+./templates.go
+./tmdb.go

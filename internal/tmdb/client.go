@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -31,6 +32,10 @@ func NewClient(apiKey string) *Client {
 
 // DiscoverMovies fetches one page. It does not import movies into MySQL.
 func (c *Client) DiscoverMovies(page int) (MovieList, error) {
+	return c.DiscoverMoviesContext(context.Background(), page)
+}
+
+func (c *Client) DiscoverMoviesContext(ctx context.Context, page int) (MovieList, error) {
 	if page < 1 || page > 500 {
 		return MovieList{}, fmt.Errorf("TMDB page must be between 1 and 500")
 	}
@@ -38,7 +43,7 @@ func (c *Client) DiscoverMovies(page int) (MovieList, error) {
 		return MovieList{}, fmt.Errorf("TMDB API key is missing")
 	}
 
-	req, err := http.NewRequest(http.MethodGet, "https://api.themoviedb.org/3/discover/movie", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.themoviedb.org/3/discover/movie", nil)
 	if err != nil {
 		return MovieList{}, fmt.Errorf("could not create TMDB request")
 	}

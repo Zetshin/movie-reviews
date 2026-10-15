@@ -1,0 +1,12 @@
+{{define "title"}}Edit actor{{end}}
+{{define "main"}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / ACTORS</p><h1>Edit actor.</h1></div></div>
+<form action="/actors/{{.Person.ID}}/edit" method="POST">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<div><label for="edit-name">Name</label>{{with .Form.FieldErrors.name}}<p class="error">{{.}}</p>{{end}}<input id="edit-name" name="name" value="{{.Form.Name}}" maxlength="255" required></div>
+<div><label for="edit-bio">Biography</label>{{with .Form.FieldErrors.bio}}<p class="error">{{.}}</p>{{end}}<textarea id="edit-bio" name="bio">{{.Form.Bio}}</textarea></div>
+<div><label for="edit-birth">Birth date</label>{{with .Form.FieldErrors.birth_date}}<p class="error">{{.}}</p>{{end}}<input id="edit-birth" type="date" name="birth_date" value="{{.Form.BirthDate}}"></div>
+<div><label for="edit-photo">Profile image URL or local path</label>{{with .Form.FieldErrors.profile_image}}<p class="error">{{.}}</p>{{end}}<input id="edit-photo" name="profile_image" value="{{.Form.ProfileImage}}" maxlength="2048"></div>
+<div class="editor-actions"><button class="button gold" type="submit">Save changes</button><a class="button subtle" href="/actors/{{.Person.ID}}">Cancel</a></div>
+</form>
+{{end}}

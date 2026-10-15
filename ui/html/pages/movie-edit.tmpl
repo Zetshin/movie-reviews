@@ -1,0 +1,14 @@
+{{define "title"}}Edit movie{{end}}
+{{define "main"}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / MOVIE LIBRARY</p><h1>Edit movie.</h1></div></div>
+<form action="/movies/{{.Movie.ID}}/edit" method="POST" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<div><label for="edit-title">Title</label>{{with .Form.FieldErrors.title}}<p class="error">{{.}}</p>{{end}}<input id="edit-title" name="title" value="{{.Form.Title}}" maxlength="255" required></div>
+<div><label for="edit-description">Synopsis</label>{{with .Form.FieldErrors.description}}<p class="error">{{.}}</p>{{end}}<textarea id="edit-description" name="description">{{.Form.Description}}</textarea></div>
+<div><label for="edit-release">Release date</label>{{with .Form.FieldErrors.release_date}}<p class="error">{{.}}</p>{{end}}<input id="edit-release" type="date" name="release_date" value="{{.Form.ReleaseDate}}"></div>
+<div class="image-picker" data-image-picker><label for="edit-poster">Poster image URL or local path</label>{{with .Form.FieldErrors.poster_image}}<p class="error">{{.}}</p>{{end}}<input id="edit-poster" name="poster_image" value="{{.Form.PosterImage}}" maxlength="2048" data-image-url><label class="image-dropzone" for="edit-poster-file" data-image-drop>Or drag a JPG/PNG here, or choose a file (up to 5 MB).<input id="edit-poster-file" type="file" name="poster_image_file" accept="image/jpeg,image/png" data-image-file></label><p data-image-status class="tmdb-help" role="status"></p><img data-image-preview class="image-preview" alt="Poster preview" hidden></div>
+<div class="image-picker" data-image-picker><label for="edit-backdrop">Backdrop image URL or local path</label>{{with .Form.FieldErrors.backdrop_image}}<p class="error">{{.}}</p>{{end}}<input id="edit-backdrop" name="backdrop_image" value="{{.Form.BackdropImage}}" maxlength="2048" data-image-url><label class="image-dropzone" for="edit-backdrop-file" data-image-drop>Or drag a JPG/PNG here, or choose a file (up to 5 MB).<input id="edit-backdrop-file" type="file" name="backdrop_image_file" accept="image/jpeg,image/png" data-image-file></label><p data-image-status class="tmdb-help" role="status"></p><img data-image-preview class="image-preview" alt="Backdrop preview" hidden></div>
+<p class="tmdb-help">Use HTTPS image links. A selected file replaces the URL for that image. After validation errors, select your file again.</p>
+<div class="editor-actions"><button class="button gold" type="submit">Save changes</button><a class="button subtle" href="/movies/{{.Movie.ID}}">Cancel</a></div>
+</form>
+{{end}}

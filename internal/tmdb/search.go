@@ -5,12 +5,16 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 )
 
-// SearchMovies returns the first page of title matches for the search dropdown.
+// SearchMovies returns one page of title matches.
 // th-TH requests Thai translations where available; it does not filter by country.
-func (c *Client) SearchMovies(query string) (MovieList, error) {
+func (c *Client) SearchMovies(query string, page int) (MovieList, error) {
+	if page < 1 || page > 500 {
+		return MovieList{}, fmt.Errorf("TMDB page must be between 1 and 500")
+	}
 	query = strings.TrimSpace(query)
 	if query == "" {
 		return MovieList{Results: []Movie{}}, nil
@@ -26,7 +30,7 @@ func (c *Client) SearchMovies(query string) (MovieList, error) {
 	params := req.URL.Query()
 	params.Set("api_key", c.apiKey)
 	params.Set("query", query)
-	params.Set("page", "1")
+	params.Set("page", strconv.Itoa(page))
 	params.Set("language", "th-TH")
 	params.Set("include_adult", "false")
 	req.URL.RawQuery = params.Encode()

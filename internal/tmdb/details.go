@@ -1,6 +1,7 @@
 package tmdb
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -26,17 +27,21 @@ type Credits struct {
 }
 
 type CastMember struct {
-	ID           int     `json:"id"`
-	Name         string  `json:"name"`
-	Character    string  `json:"character"`
-	ProfilePath  *string `json:"profile_path"`
-	Order        int     `json:"order"`
-	CreditID     string  `json:"credit_id"`
+	ID          int     `json:"id"`
+	Name        string  `json:"name"`
+	Character   string  `json:"character"`
+	ProfilePath *string `json:"profile_path"`
+	Order       int     `json:"order"`
+	CreditID    string  `json:"credit_id"`
 }
 
 // GetMovie fetches one movie and its cast in one request.
 // It does not read .env or write to MySQL.
 func (c *Client) GetMovie(tmdbID int) (MovieDetails, error) {
+	return c.GetMovieContext(context.Background(), tmdbID)
+}
+
+func (c *Client) GetMovieContext(ctx context.Context, tmdbID int) (MovieDetails, error) {
 	if tmdbID < 1 {
 		return MovieDetails{}, fmt.Errorf("TMDB movie ID must be positive")
 	}
@@ -45,7 +50,7 @@ func (c *Client) GetMovie(tmdbID int) (MovieDetails, error) {
 	}
 
 	endpoint := fmt.Sprintf("https://api.themoviedb.org/3/movie/%d", tmdbID)
-	req, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return MovieDetails{}, fmt.Errorf("could not create TMDB details request")
 	}

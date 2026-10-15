@@ -26,11 +26,84 @@ type MovieModel struct {
 	DB *sql.DB
 }
 
+func (m *MovieModel) Count() (int, error) {
+	var count int
+	err := m.DB.QueryRow(`SELECT COUNT(*) FROM movies`).Scan(&count)
+	return count, err
+}
+
+func (m *MovieModel) LocalIDForTMDB(tmdbID int) (int, error) {
+	var id int
+	err := m.DB.QueryRow(`SELECT id FROM movies WHERE tmdb_id = ?`, tmdbID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrNoRecord
+	}
+	return id, err
+}
+
+func (m *MovieModel) ListPage(limit, offset int) ([]Movie, error) {
+	rows, err := m.DB.Query(`SELECT id, title, description, release_date, COALESCE(poster_image, ''), review_count, avg_rating, COALESCE(backdrop_image, '') FROM movies ORDER BY release_date DESC, id DESC LIMIT ? OFFSET ?`, limit, offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	movies := make([]Movie, 0)
+	for rows.Next() {
+		var movie Movie
+		var date sql.NullTime
+		if err := rows.Scan(&movie.ID, &movie.Title, &movie.Description, &date, &movie.PosterImage, &movie.ReviewCount, &movie.AvgRating, &movie.BackdropImage); err != nil {
+			return nil, err
+		}
+		movie.ReleaseDate = date.Time
+		movies = append(movies, movie)
+	}
+	return movies, rows.Err()
+}
+
+func (m *MovieModel) ImportedTMDBIDs(ids []int) (map[int]bool, error) {
+	imported := make(map[int]bool)
+	if len(ids) == 0 {
+		return imported, nil
+	}
+	args := make([]any, len(ids))
+	for i, id := range ids {
+		args[i] = id
+	}
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(ids)), ",")
+	rows, err := m.DB.Query(`SELECT tmdb_id FROM movies WHERE tmdb_id IN (`+placeholders+`)`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		imported[id] = true
+	}
+	return imported, rows.Err()
+}
+
 // This will insert a new snippet into the database.
-func (m *MovieModel) Insert(title string, description string, release_date time.Time, poster_image string) (int, error) {
-	stmt := `INSERT INTO movies (title, description, release_date, poster_image)
-	VALUES(?,?,?,?)`
-	result, err := m.DB.Exec(stmt, title, description, release_date, poster_image)
+type ManualCastCredit struct {
+	PersonID      int
+	CharacterName string
+}
+
+func (m *MovieModel) Insert(title string, description string, release_date time.Time, poster_image string, backdropImage string, cast ...ManualCastCredit) (int, error) {
+	tx, err := m.DB.Begin()
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback()
+	stmt := `INSERT INTO movies (title, description, release_date, poster_image, backdrop_image)
+	VALUES(?,?,?,?,?)`
+	var date any
+	if !release_date.IsZero() {
+		date = release_date
+	}
+	result, err := tx.Exec(stmt, title, description, date, poster_image, backdropImage)
 	if err != nil {
 		return 0, err
 	}
@@ -42,6 +115,15 @@ func (m *MovieModel) Insert(title string, description string, release_date time.
 	}
 	// The ID returned has the type int64, so we convert it to an int type
 	// before returning.
+	for order, credit := range cast {
+		_, err = tx.Exec(`INSERT INTO movie_persons (movie_id, person_id, role, cast_order, character_name) VALUES (?, ?, 'actor', ?, ?)`, id, credit.PersonID, order, credit.CharacterName)
+		if err != nil {
+			return 0, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
 	return int(id), nil
 
 }
@@ -194,7 +276,7 @@ func (m *MovieModel) Search(query string, limit int) ([]Movie, error) {
 // Both tables must have a nullable tmdb_id column with a UNIQUE index.
 // Existing records are reused; only a missing backdrop is filled on reimport.
 // Other metadata and review statistics are preserved.
-func (m *MovieModel) ImportTMDB(movie Movie, cast []Person) (int, error) {
+func (m *MovieModel) ImportTMDB(movie Movie, cast []ImportedCastMember) (int, error) {
 	if movie.TMDBID < 1 || strings.TrimSpace(movie.Title) == "" {
 		return 0, fmt.Errorf("TMDB movie must have a positive ID and a title")
 	}
@@ -229,7 +311,7 @@ func (m *MovieModel) ImportTMDB(movie Movie, cast []Person) (int, error) {
 	}
 
 	// Use a consistent person lock order when different movies share cast.
-	cast = append([]Person(nil), cast...)
+	cast = append([]ImportedCastMember(nil), cast...)
 	sort.Slice(cast, func(i, j int) bool { return cast[i].TMDBID < cast[j].TMDBID })
 	for _, person := range cast {
 		result, err := tx.Exec(`INSERT INTO persons (tmdb_id, name, profile_image)
@@ -244,9 +326,9 @@ func (m *MovieModel) ImportTMDB(movie Movie, cast []Person) (int, error) {
 			return 0, err
 		}
 		// These are local database IDs, not TMDB IDs. Preserve an existing role.
-		_, err = tx.Exec(`INSERT INTO movie_persons (movie_id, person_id, role)
-			VALUES (?, ?, 'actor')
-			ON DUPLICATE KEY UPDATE role = role`, movieID, personID)
+		_, err = tx.Exec(`INSERT INTO movie_persons (movie_id, person_id, role, cast_order, character_name)
+			VALUES (?, ?, 'actor', ?, ?)
+			ON DUPLICATE KEY UPDATE cast_order = ?, character_name = ?`, movieID, personID, person.Order, person.CharacterName, person.Order, person.CharacterName)
 		if err != nil {
 			return 0, err
 		}

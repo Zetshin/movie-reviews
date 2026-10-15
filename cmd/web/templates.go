@@ -2,7 +2,9 @@ package main
 
 import (
 	"html/template"
+	"net/url"
 	"path/filepath"
+	"strconv"
 	"time"
 
 	"github.com/Zetshin/movie-reviews/internal/models"
@@ -27,6 +29,7 @@ type HomeTopPick struct {
 // any dynamic data that we want to pass to our HTML templates.
 
 type templateData struct {
+	Cast            []models.CastMember
 	Person          models.Person
 	PersonMovies    []models.FilmographyItem
 	User            models.User
@@ -36,10 +39,12 @@ type templateData struct {
 	CurrentYear     int
 	Movie           models.Movie
 	Movies          []models.Movie
+	HeroMovies      []models.Movie
 	Form            any
 	Flash           string
 	Reviews         []models.Review
 	Pagination      paginationData
+	PageURL         string
 	IsAuthenticated bool // Add an IsAuthenticated field to the templateData struct.
 	IsAdmin         bool
 	CSRFToken       string
@@ -49,6 +54,15 @@ type templateData struct {
 	TMDBMovies      []tmdb.Movie
 	TMDBSearchDone  bool
 	TMDBError       string
+	TMDBCategory    string
+	TMDBPage        int
+	TMDBTotalPages  int
+	TMDBPreviousURL string
+	TMDBNextURL     string
+	TMDBImported    map[int]bool
+	TMDBPeople      []tmdb.TrendingPerson
+	AdminSection    string
+	ReturnMovie     models.Movie
 }
 
 // Create a humanDate function which returns a nicely formatted string
@@ -63,6 +77,49 @@ func humanDate(t time.Time) string {
 var functions = template.FuncMap{
 	"humanDate":    humanDate,
 	"tmdbImageURL": tmdb.ImageURL,
+	"pageLinks":    pageLinks,
+}
+
+type pageLink struct {
+	Number  int
+	URL     string
+	Current bool
+}
+
+// Show the first/last pages and nearby pages, using zero for an ellipsis.
+// Change only page, preserving searches, filters, sorting and the fragment.
+func pageLinks(current, total int, rawURL, fragment string) []pageLink {
+	if total < 1 {
+		return nil
+	}
+	current = max(1, min(current, total))
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return nil
+	}
+	u.Fragment = fragment
+	query := u.Query()
+	var links []pageLink
+	previous := 0
+	for number := 1; number <= total; number++ {
+		if total > 7 && number != 1 && number != total && (number < current-2 || number > current+2) {
+			continue
+		}
+		if number-previous > 1 {
+			if number-previous == 2 {
+				query.Set("page", strconv.Itoa(previous+1))
+				u.RawQuery = query.Encode()
+				links = append(links, pageLink{Number: previous + 1, URL: u.String()})
+			} else {
+				links = append(links, pageLink{})
+			}
+		}
+		query.Set("page", strconv.Itoa(number))
+		u.RawQuery = query.Encode()
+		links = append(links, pageLink{Number: number, URL: u.String(), Current: number == current})
+		previous = number
+	}
+	return links
 }
 
 func newTemplateCache() (map[string]*template.Template, error) {

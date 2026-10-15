@@ -1,0 +1,37 @@
+{{define "title"}}Manage Actors{{end}}
+{{define "main"}}
+{{template "admin-sections" .}}
+<div class="page-heading"><div><p class="eyebrow">ADMIN / ACTOR LIBRARY</p><h1>Grow your actor library.</h1><p class="muted">Import actors with their available biographies, or add a profile yourself.</p></div><a class="button subtle" href="/actors/">View actors</a></div>
+<section class="tmdb-admin" aria-labelledby="people-import-title">
+<h2 id="people-import-title">Discover &amp; import actors</h2>
+<form action="/actors/add" method="GET" class="tmdb-browse-form">
+<div><label for="people-category">Browse</label><select id="people-category" name="category"><option value="popular" {{if ne .TMDBCategory "search"}}selected{{end}}>Popular actors</option><option value="search" {{if eq .TMDBCategory "search"}}selected{{end}}>Search by name</option></select></div>
+<div><label for="people-query">Search by name (optional)</label><input id="people-query" type="search" name="q" value="{{.TMDBSearch}}" maxlength="100" placeholder="Type a name, or leave blank to browse"></div>
+<button class="button gold" type="submit">Browse TMDB</button>
+</form>
+{{with .TMDBError}}<p class="error" role="alert">{{.}}</p>{{end}}
+{{if .TMDBPeople}}
+<p class="tmdb-help">Import includes available biography, birthday, and profile image. Existing profiles are reused and edited fields are retained.</p>
+<div class="tmdb-results">
+{{range .TMDBPeople}}
+<article class="tmdb-result">
+{{if .ProfilePath}}<img class="tmdb-poster" src="{{tmdbImageURL .ProfilePath}}" alt="{{.Name}}" loading="lazy">{{else}}<div class="tmdb-poster tmdb-no-poster">No photo</div>{{end}}
+<div class="tmdb-result-copy"><h3>{{.Name}}</h3><p class="tmdb-help">TMDB #{{.ID}}</p>
+<form action="/actors/add" method="POST"><input type="hidden" name="csrf_token" value="{{$.CSRFToken}}"><input type="hidden" name="action" value="import_tmdb"><input type="hidden" name="tmdb_id" value="{{.ID}}"><button class="button gold compact" type="submit">{{if index $.TMDBImported .ID}}Fill missing details{{else}}Import actor{{end}}</button></form>
+</div></article>
+{{end}}
+</div>
+<nav class="pagination" aria-label="TMDB actor pages">{{if .TMDBPreviousURL}}<a class="button subtle compact" href="{{.TMDBPreviousURL}}">&larr; Previous</a>{{end}}{{template "page-links" (pageLinks .TMDBPage .TMDBTotalPages .PageURL "")}}{{if .TMDBNextURL}}<a class="button subtle compact" href="{{.TMDBNextURL}}">Next &rarr;</a>{{end}}</nav>
+{{else if and .TMDBSearchDone (not .TMDBError)}}<p class="empty-state">No actors found. Try another name.</p>{{else if not .TMDBError}}<p class="tmdb-help">Enter a name to search TMDB.</p>{{end}}
+</section>
+<h2>Add an actor manually</h2>
+<form action="/actors/add" method="POST" enctype="multipart/form-data">
+<input type="hidden" name="csrf_token" value="{{.CSRFToken}}">
+<div><label for="person-name">Name</label>{{with .Form.FieldErrors.name}}<p class="error">{{.}}</p>{{end}}<input id="person-name" name="name" value="{{.Form.Name}}" maxlength="255" required></div>
+<div><label for="person-bio">Biography</label>{{with .Form.FieldErrors.bio}}<p class="error">{{.}}</p>{{end}}<textarea id="person-bio" name="bio">{{.Form.Bio}}</textarea></div>
+<div><label for="person-birth">Birth date (optional)</label>{{with .Form.FieldErrors.birth_date}}<p class="error">{{.}}</p>{{end}}<input id="person-birth" type="date" name="birth_date" value="{{.Form.BirthDate}}"></div>
+<div class="image-picker" data-image-picker><label for="person-photo">Profile image URL or local path</label>{{with .Form.FieldErrors.profile_image}}<p class="error">{{.}}</p>{{end}}<input id="person-photo" name="profile_image" value="{{.Form.ProfileImage}}" maxlength="2048" data-image-url><label class="image-dropzone" for="person-photo-file" data-image-drop>Or drag a JPG/PNG here, or choose a file (up to 5 MB).<input id="person-photo-file" type="file" name="profile_image_file" accept="image/jpeg,image/png" data-image-file></label><p data-image-status class="tmdb-help" role="status"></p><img data-image-preview class="image-preview" alt="Actor photo preview" hidden></div>
+<p class="tmdb-help">Use HTTPS image links. A selected file replaces the URL when you save. After validation errors, select the file again.</p>
+<div class="editor-actions"><button class="button gold" type="submit">Create actor</button></div>
+</form>
+{{end}}

@@ -10,9 +10,8 @@
   if (slides.length < 2) { controls.hidden = true; return; }
   const dotsContainer = hero.querySelector('.slide-dots');
   const pause = hero.querySelector('[data-carousel="pause"]');
-  const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
   let current = 0;
-  let paused = motion.matches;
+  let paused = false;
   let timer;
   const dots = slides.map((slide, index) => {
     const dot = document.createElement('button');
@@ -30,21 +29,23 @@
   }
   function schedule() {
     clearInterval(timer);
-    pause.textContent = paused ? '▶' : 'Ⅱ';
+    pause.textContent = paused ? '\u25B6' : '\u23F8';
     pause.setAttribute('aria-label', paused ? 'Start automatic slides' : 'Pause automatic slides');
-    if (!paused && !document.hidden && !hero.matches(':hover') && !hero.contains(document.activeElement)) {
+    // Hovering the Hero should not stop autoplay. Focused story links stay still,
+    // while the stable controls can start/resume playback without losing focus.
+    const storyHasFocus = hero.contains(document.activeElement) && !controls.contains(document.activeElement);
+    if (!paused && !document.hidden && !storyHasFocus) {
       timer = setInterval(() => show(current + 1), 6000);
     }
   }
   hero.querySelector('[data-carousel="previous"]').addEventListener('click', () => { show(current - 1); schedule(); });
   hero.querySelector('[data-carousel="next"]').addEventListener('click', () => { show(current + 1); schedule(); });
   pause.addEventListener('click', () => { paused = !paused; schedule(); });
-  hero.addEventListener('mouseenter', schedule);
-  hero.addEventListener('mouseleave', schedule);
   hero.addEventListener('focusin', schedule);
   hero.addEventListener('focusout', () => setTimeout(schedule, 0));
   document.addEventListener('visibilitychange', schedule);
-  motion.addEventListener('change', () => { paused = motion.matches; schedule(); });
+  hero.querySelector('[data-carousel="previous"]').textContent = '\u2190';
+  hero.querySelector('[data-carousel="next"]').textContent = '\u2192';
   show(0);
   schedule();
 })();
@@ -86,7 +87,7 @@
     timer = setTimeout(async () => {
       controller = new AbortController();
       try {
-        const responses = await Promise.all(["movies", "persons"].map(type => fetch(`/${type}/search?q=${encodeURIComponent(query)}`, {signal: controller.signal})));
+        const responses = await Promise.all(["movies", "actors"].map(type => fetch(`/${type}/search?q=${encodeURIComponent(query)}`, {signal: controller.signal})));
         if (responses.some(response => !response.ok)) throw new Error('Search failed');
         const [films, people] = await Promise.all(responses.map(response => response.json()));
         const movies = [...films.map(movie => ({...movie, kind: 'movie'})), ...people.map(person => ({id: person.id, title: person.name, poster_image: person.profile_image, kind: 'person'}))];
@@ -97,7 +98,7 @@
           option.id = `search-${movie.kind}-${movie.id}`;
           option.setAttribute('role', 'option'); option.setAttribute('aria-selected', 'false');
           const link = document.createElement('a');
-          link.href = `/${movie.kind === 'person' ? 'persons' : 'movies'}/${Number(movie.id)}`;
+          link.href = `/${movie.kind === 'person' ? 'actors' : 'movies'}/${Number(movie.id)}`;
           const poster = document.createElement('span'); poster.className = 'search-poster'; poster.textContent = '★';
           if (movie.poster_image) {
             const url = new URL(movie.poster_image, location.origin);
@@ -107,10 +108,10 @@
           }
           const copy = document.createElement('span');
           const title = document.createElement('strong'); title.textContent = movie.title;
-          const meta = document.createElement('small'); meta.textContent = movie.kind === 'person' ? 'Person · View profile' : `Movie · ${movie.release_year || 'Year unavailable'} · ★ ${movie.avg_rating} / 5`;
+          const meta = document.createElement('small'); meta.textContent = movie.kind === 'person' ? 'Actor · View profile' : `Movie · ${movie.release_year || 'Year unavailable'} · ★ ${movie.avg_rating} / 5`;
           copy.append(title, meta); link.append(poster, copy); option.append(link); list.append(option);
         }
-        open(movies.length ? `${movies.length} results` : 'No movies or people found');
+        open(movies.length ? `${movies.length} results` : 'No movies or actors found');
       } catch (error) {
         if (error.name !== 'AbortError' && request === version) open('Could not search. Please try again.');
       }
