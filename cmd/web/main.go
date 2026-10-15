@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 	"time"
 
@@ -68,6 +69,11 @@ type application struct {
 	heroCache      heroCache
 	authLimiter    *rateLimiter
 	passwordMailer passwordResetMailer
+	// resetLimiter caps reset emails per address; mailSlots caps concurrent
+	// SMTP sends; background lets shutdown wait for in-flight emails.
+	resetLimiter *rateLimiter
+	mailSlots    chan struct{}
+	background   sync.WaitGroup
 }
 
 func envString(key, fallback string) string {
@@ -195,9 +201,13 @@ func main() {
 		tmdb:           tmdb.NewClient(apiKey),
 		authLimiter:    newRateLimiter(10, time.Minute),
 		passwordMailer: newPasswordResetMailer(cfg),
+		resetLimiter:   newRateLimiter(3, time.Hour),
+		mailSlots:      make(chan struct{}, 4),
 	}
 	if app.passwordMailer == nil {
 		logger.Warn("password reset email is disabled; set SMTP_HOST and MAIL_FROM")
+	} else {
+		logger.Info("password reset email enabled", "smtp_host", cfg.smtpHost, "smtp_port", cfg.smtpPort, "from", cfg.mailFrom, "require_tls", cfg.smtpRequireTLS)
 	}
 
 	if *syncMetadata {
@@ -267,7 +277,17 @@ func (app *application) serve() error {
 		app.logger.Info("shutting down server", "signal", s.String())
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 		defer cancel()
-		shutdownErr <- srv.Shutdown(ctx)
+		err := srv.Shutdown(ctx)
+		// Let in-flight password reset emails finish (each is bounded by
+		// its own 30 second timeout) so a deploy does not drop them.
+		waited := make(chan struct{})
+		go func() { app.background.Wait(); close(waited) }()
+		select {
+		case <-waited:
+		case <-time.After(30 * time.Second):
+			app.logger.Warn("shutdown: gave up waiting for background email")
+		}
+		shutdownErr <- err
 	}()
 
 	app.logger.Info("starting server", "version", version, "addr", srv.Addr, "tls", app.config.tls)
