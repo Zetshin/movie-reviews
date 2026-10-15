@@ -120,8 +120,10 @@ jobs:
         run: |
           # The package may be private: log in with this run's short-lived
           # token (passed on stdin, never on the command line), pull, log out.
+          # Run under sh explicitly: the login shell may be zsh, where
+          # "status" is a read-only variable.
           printf '%s' "$GHCR_TOKEN" | ssh -i ~/.ssh/deploy_key -p "$PORT" "$SSH_USER@$HOST" \
-            "docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null && cd '$DEPLOY_PATH' && sh deploy.sh '$IMAGE'; status=\$?; docker logout ghcr.io >/dev/null; exit \$status"
+            "sh -c 'docker login ghcr.io -u \"\$1\" --password-stdin >/dev/null && cd \"\$2\" && sh deploy.sh \"\$3\"; rc=\$?; docker logout ghcr.io >/dev/null; exit \$rc' deploy '$GHCR_USER' '$DEPLOY_PATH' '$IMAGE'"
 
       - name: Verify public health check
         if: vars.APP_URL != ''
