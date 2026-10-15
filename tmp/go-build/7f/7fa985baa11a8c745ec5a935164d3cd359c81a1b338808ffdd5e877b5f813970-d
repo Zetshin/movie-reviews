@@ -1,8 +1,0 @@
-./client.go
-./details.go
-./now_playing.go
-./people.go
-./person.go
-./search.go
-./trending_people.go
-./types.go

@@ -1,8 +1,0 @@
-./catalog_admin.go
-./catalog_metadata.go
-./errors.go
-./movie_person.go
-./movies.go
-./persons.go
-./review.go
-./users.go
