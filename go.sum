@@ -6,8 +6,8 @@ github.com/alexedwards/scs/v2 v2.9.0 h1:xa05mVpwTBm1iLeTMNFfAWpKUm4fXAW7CeAViqBV
 github.com/alexedwards/scs/v2 v2.9.0/go.mod h1:ToaROZxyKukJKT/xLcVQAChi5k6+Pn1Gvmdl7h3RRj8=
 github.com/go-playground/assert/v2 v2.2.0 h1:JvknZsQTYeFEAhQwI4qEt9cyV5ONwRHC+lYKSsYSR8s=
 github.com/go-playground/assert/v2 v2.2.0/go.mod h1:VDjEfimB/XKnb+ZQfWdccd7VUvScMdVu0Titje2rxJ4=
-github.com/go-playground/form/v4 v4.5.0 h1:dBgwpNXdqVp0OTWf3SOQ8xTwDjf3bKbOnkQnggVKqfw=
-github.com/go-playground/form/v4 v4.5.0/go.mod h1:YbN7U9uNnXsOA1Ac050LOZ2AY6yScYl26mhrhoLpmlM=
+github.com/go-playground/form/v4 v4.5.1 h1:b+rich49d6Cj0dlRKunTmMD/pteoElnD+gpk1TzlU5E=
+github.com/go-playground/form/v4 v4.5.1/go.mod h1:YbN7U9uNnXsOA1Ac050LOZ2AY6yScYl26mhrhoLpmlM=
 github.com/go-sql-driver/mysql v1.7.1/go.mod h1:OXbVy3sEdcQ2Doequ6Z5BW6fXNQTmx+9S1MCJN5yJMI=
 github.com/go-sql-driver/mysql v1.10.1 h1:arlSnNLq6a5yxGxV7qg9lF4j0C+KwD6NbQyKr9QL6ME=
 github.com/go-sql-driver/mysql v1.10.1/go.mod h1:M+cqaI7+xxXGG9swrdeUIoPG3Y3KCkF0pZej+SK+nWk=
